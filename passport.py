@@ -4,13 +4,37 @@ import numpy as np
 
 # CONSTANTS
 
-# Ratio of required final image size, e.g., 33mm / 48mm
+# Width to Height Ratio of required final image size, e.g., 33mm / 48mm
 image_ratio=33.0/48.0 
+
+# Distance from chin to bottom of picture divided by picture length
+chin_height_ratio=7.0/48.0
+
 
 blue  = (255,0,0)
 green = (0,255,0)
 red   = (0,0,255)
 
+
+def maxpect(image_ratio, frame_width, frame_height):
+    # Rescale camera size to the maximum aspect ratio it'll fit.
+
+    if (image_ratio < frame_width/frame_height):
+        final_height=frame_height
+        final_width=int(frame_height*image_ratio)
+    else:
+        final_width=frame_width
+        final_height=int(frame_width/image_ratio)
+
+    if (final_width>frame_width):
+        final_height=final_height*frame_width/final_width
+        final_width=frame_width
+
+    if (final_height>frame_height):
+        final_width=final_width*frame_height/final_height
+        final_height=frame_height
+        
+    return (final_width, final_height)
 
 def init():
     # Initialize the camera and Haar cascades
@@ -42,19 +66,15 @@ def init():
         exit(1)
 
     # Set camera to max resolution -- too slow and unneeded?
-#    capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 100000)
-#    capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT,100000)
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 100000)
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT,100000)
 
     frame_width=int(capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
     frame_height=int(capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
     print("Capturing at %d x %d\n" % (frame_width, frame_height) )
 
-    if (image_ratio<1):
-        final_height=frame_height
-        final_width=int(frame_height*image_ratio)
-    else:
-        final_width=frame_width
-        final_height=int(frame_width/image_ratio)
+    (final_width, final_height)=maxpect(image_ratio, frame_width, frame_height)
+
 
     print("Output image size will be %d x %d\n" % (final_width, final_height) )
 
@@ -109,11 +129,13 @@ def centerandscale(img, (x, y, w, h), (ex,ey,ew,eh)):
     heightofeyes=((y+ey) + (y+ey+eh))/2.0 # Eyes are relative to face box
     chintoeyes=abs(heightofchin - heightofeyes)
 
-    # The eyes are in the middle and there is a gap of 1/7th between
-    # chin and bottom of picture. That means, the distance from the
-    # chin to the eyes, chintoeyes, should be, once scaled, be equal
-    # to 5/14th of the frame height.
-    scale = 5.0/14 * frame_height/chintoeyes
+    # The eyes are in the middle and there is a chin_height_ratio
+    # percentage gap between chin and bottom of picture. (E.g.,
+    # 1/7th). That means, the distance from the chin to the eyes,
+    # chintoeyes, should be, once scaled, be equal to
+    # (1/2- chin_height_ratio) times the frame height. (E.g., 5/14th).
+
+    scale = (0.5-chin_height_ratio) * frame_height/chintoeyes
     img = cv2.resize(img, None, fx=scale, fy=scale)
 
     # This is silly. How do I numptify this?
