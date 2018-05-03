@@ -122,6 +122,11 @@ def init():
     capture.read()
     fps=FPS()
 
+    # Give some hints to the user on stdout
+    print("Press space to save passport.jpg, q to quit.")
+
+
+# Static vars for findtheface so image doesn't jump back if we lose the face.
 oldfaces=None
 oldeyes=None
 def findtheface(img):
