@@ -12,6 +12,10 @@ to "passport.jpg" and 'q' to quit. (TIP: If you leave `eog
 passport.jpg` running in the background, you'll see the snapped
 picture update immediately so you can tell if you like it or not).
 
+The face detection routine is a bit CPU hungry so the image is
+downscaled to fit in a 640x640 square before processing to get a
+better frame rate. 
+
 # Customization
 
 At the moment, size is hardcoded to 33mm x 48mm, with the distance
@@ -39,10 +43,17 @@ release.
 You can only take one photo. Every photo you take overwrite the
 previous 'passport.jpg' file.
 
-Only the first camera is opened.
+Only the first camera is opened. You can change that by editing
+camera_device at the beginning of the file.
 
-The face detection routine is a bit CPU hungry so maybe I should
-downscale the image before processing it to get a better frame rate. 
+When recentering the face, especially if it is very close to the
+camera, there may not be enough picture from the camera to extend all
+the way to the edge of the final photo. The program should warn about
+this and give a visual indication of which way to move to fix it.
+
+If your face is too far away, the camera will zoom in too much,
+causing a blurry picture. This program should detect if height or
+width is less than 256 and ask the user to step closer.
 
 I wrote this using Python2 and OpenCV2 since that's the only OpenCV
 Debian GNU/Linux has packaged for Python.
