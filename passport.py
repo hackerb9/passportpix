@@ -14,7 +14,7 @@ chin_height_ratio=7.0/48.0
 camera_device=0
 
 # What resolution in pixels to downscale the image to (max width, height)
-downscale=640
+downscale=320
 
 
 blue  = (255,0,0)
