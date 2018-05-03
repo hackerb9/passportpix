@@ -10,36 +10,42 @@ image_ratio=33.0/48.0
 # Distance from chin to bottom of picture divided by picture length
 chin_height_ratio=7.0/48.0
 
+# Which camera to open (first is 0)
+camera_device=0
+
 
 blue  = (255,0,0)
 green = (0,255,0)
 red   = (0,0,255)
 
 
-def maxpect(image_ratio, frame_width, frame_height):
+def maxpect(image_ratio, old_width, old_height):
     # Rescale camera size to the maximum aspect ratio it'll fit.
+    # Input: image_ratio == desired width/height
+    #	     old_width, old_height == current width/height
+    # Output: (new_width, new_height)
 
-    if (image_ratio < frame_width/frame_height):
-        final_height=frame_height
-        final_width=int(frame_height*image_ratio)
+    if (image_ratio < old_width/old_height):
+        new_height=old_height
+        new_width=int(old_height*image_ratio)
     else:
-        final_width=frame_width
-        final_height=int(frame_width/image_ratio)
+        new_width=old_width
+        new_height=int(old_width/image_ratio)
 
-    if (final_width>frame_width):
-        final_height=final_height*frame_width/final_width
-        final_width=frame_width
+    if (new_width>old_width):
+        new_height=new_height*old_width/new_width
+        new_width=old_width
 
-    if (final_height>frame_height):
-        final_width=final_width*frame_height/final_height
-        final_height=frame_height
+    if (new_height>old_height):
+        new_width=new_width*old_height/new_height
+        new_height=old_height
         
-    return (final_width, final_height)
+    return (new_width, new_height)
 
 def init():
     # Initialize the camera and Haar cascades
     global face_cascade, eye_cascade, capture
-    global frame_width, frame_height, final_width, final_height
+    global frame_width, frame_height
 
     # Load up the sample Haar cascades from opencv-data (or current directory)
     for path in ('.', 'haarcascades', '/usr/local/share/opencv/haarcascades/',
@@ -60,7 +66,7 @@ def init():
         exit(1)
 
     # Open the camera
-    capture = cv2.VideoCapture(0)
+    capture = cv2.VideoCapture(camera_device)
     if (not capture.isOpened()):
         print("Huh. Video device #0 didn't open properly. Dying.")
         exit(1)
@@ -69,14 +75,12 @@ def init():
     capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 100000)
     capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT,100000)
 
-    frame_width=int(capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
-    frame_height=int(capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+    frame_width=float(capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
+    frame_height=float(capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
     print("Capturing at %d x %d\n" % (frame_width, frame_height) )
 
-    (final_width, final_height)=maxpect(image_ratio, frame_width, frame_height)
-
-
-    print("Output image size will be %d x %d\n" % (final_width, final_height) )
+    print("Output image size will be %d x %d\n" %
+          maxpect(image_ratio, frame_width, frame_height))
 
 
 oldfaces=None
@@ -125,6 +129,8 @@ def centerandscale(img, (x, y, w, h), (ex,ey,ew,eh)):
     # Given the image and bounding boxes for the face and eyes,
     # recenter the image and scale it so the eyes are in the right place.
 
+    height, width, channels = img.shape
+
     heightofchin=y+h                      # Bottom of bounding box.
     heightofeyes=((y+ey) + (y+ey+eh))/2.0 # Eyes are relative to face box
     chintoeyes=abs(heightofchin - heightofeyes)
@@ -133,9 +139,9 @@ def centerandscale(img, (x, y, w, h), (ex,ey,ew,eh)):
     # percentage gap between chin and bottom of picture. (E.g.,
     # 1/7th). That means, the distance from the chin to the eyes,
     # chintoeyes, should be, once scaled, be equal to
-    # (1/2- chin_height_ratio) times the frame height. (E.g., 5/14th).
+    # (1/2- chin_height_ratio) times the image height. (E.g., 5/14th).
 
-    scale = (0.5-chin_height_ratio) * frame_height/chintoeyes
+    scale = (0.5-chin_height_ratio) * height/chintoeyes
     img = cv2.resize(img, None, fx=scale, fy=scale)
 
     # This is silly. How do I numptify this?
@@ -149,17 +155,19 @@ def centerandscale(img, (x, y, w, h), (ex,ey,ew,eh)):
     eh=scale*eh
 
     # Translation needed in the X and Y directions to put eyes in center
-    tx = frame_width/2-(x+ex+(x+ex+ew))/2
-    ty = frame_height/2-(y+ey+(y+ey+eh))/2
+    tx = width/2-(x+ex+(x+ex+ew))/2
+    ty = height/2-(y+ey+(y+ey+eh))/2
     M = np.float32([[1,0,tx],[0,1,ty]])
-    img = cv2.warpAffine(img,M,(frame_width,frame_height))
+    img = cv2.warpAffine(img,M,(width,height))
     return img
 
 def crop(img):
-    # Given an image, and the global variables final_width & _height,
-    # return image cropped to final resolution, centered on the original.
-    tx=(final_width-frame_width)/2
-    ty=(final_height-frame_height)/2
+    # Given an image, and the global variable image_ratio
+    # return image cropped to correct aspect ratio, centered on the original.
+    height, width, channels = img.shape
+    (final_width, final_height) = maxpect(image_ratio, width, height)
+    tx=(final_width-width)/2
+    ty=(final_height-height)/2
     M = np.float32([[1,0,tx],[0,1,ty]])
     img = cv2.warpAffine(img,M,(final_width,final_height))
     return img
@@ -168,10 +176,14 @@ def main():
     init()
 
     while True:
-        (rv, img) = capture.read()
+        (rv, original) = capture.read()
         if (not rv): break
 
-        original=img.copy()
+        img = cv2.resize(original,
+                         maxpect(frame_width/frame_height, 640,640))
+        imgscale=float(original.shape[0])/img.shape[0]
+
+#        img=original.copy()
         (face, eyes) = findtheface(img)
 
         if (face is not None and eyes is not None):
@@ -184,7 +196,9 @@ def main():
         if (c == 'q' or c == '\x1b'):
             break
         if (c == ' ' or c=='p' or c=='s'):       # Print a screenshot
-            img=centerandscale(original, face[0], eyes[0])
+            img=centerandscale(original,
+                               np.dot(face[0], imgscale),
+                               np.dot(eyes[0], imgscale))
             img=crop(img)
             cv2.imwrite("passport.jpg", img)
             print("Wrote image to passport.jpg")
