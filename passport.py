@@ -17,8 +17,12 @@ chin_height_ratio=7.0/48.0
 # Which camera to open (first is 0)
 camera_device=0
 
+# Is camera on its side? 0 == nope, 1 == 90, 2 == 180, 3 == 270.
+camera_rotation=0
+
 # What resolution in pixels to downscale the image to (max width, height)
 # This is used both to speed up the Haar cascade and for display on the screen.
+# It does not affect the final output image resolution. 
 downscale=320
 
 
@@ -55,7 +59,7 @@ def maxpect(image_ratio, old_width, old_height):
 def init():
     # Initialize the camera and Haar cascades as global variables
     global face_cascade, eye_cascade, capture
-    global frame_width, frame_height
+    global frame_width, frame_height, frame_downscale
     global fps
 
     # Load up the sample Haar cascades from opencv-data (or current directory)
@@ -88,10 +92,24 @@ def init():
 
     frame_width=float(capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
-    print("Capturing at %d x %d\n" % (frame_width, frame_height) )
 
-    print("Output image size will be %d x %d\n" %
+    if (camera_rotation==1 or camera_rotation==3):
+        frame_width, frame_height = frame_height, frame_width
+
+    print("Capturing at %d x %d" % (frame_width, frame_height) )
+
+    print("Output image size will be %d x %d" %
           maxpect(image_ratio, frame_width, frame_height))
+
+
+    # Downscaled (width, height) for Haar processing and display.
+    # (Same aspect ratio, but fits in a square of length downscale).
+    # See 'downscale' global variable at the top of this file.
+    frame_downscale=maxpect(frame_width/frame_height, downscale, downscale)
+
+    print("Downscaled size for internal processing is %d x %d\n"
+          % frame_downscale)
+
 
     # Read at least one image before starting the FPS counter 
     capture.read()
@@ -195,9 +213,12 @@ def main():
 
         fps.incrementFrames()
 
+        # Rotate the image, if the camera is on its side
+        if (camera_rotation):
+            original=np.rot90(original, camera_rotation)
+
         # Downscale image to make findtheface() faster
-        img = cv2.resize(
-            original, maxpect(frame_width/frame_height, downscale, downscale))
+        img = cv2.resize(original, frame_downscale)
         imgscale=float(original.shape[0])/img.shape[0]
 
         # Find the face and eyes using the Haar cascade
