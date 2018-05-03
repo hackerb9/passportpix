@@ -2,6 +2,10 @@
 import cv2 as cv2
 import numpy as np
 
+# My files
+from fps import FPS
+from eprint import eprint
+
 # CONSTANTS
 
 # Width to Height Ratio of required final image size, e.g., 33mm / 48mm
@@ -11,15 +15,18 @@ image_ratio=33.0/48.0
 chin_height_ratio=7.0/48.0
 
 # Which camera to open (first is 0)
-camera_device=0
+camera_device=1
 
 # What resolution in pixels to downscale the image to (max width, height)
+# This is used both to speed up the Haar cascade and for display on the screen.
 downscale=320
 
 
 blue  = (255,0,0)
 green = (0,255,0)
 red   = (0,0,255)
+
+title = "Hit space to save passport.jpg, q to quit"
 
 
 def maxpect(image_ratio, old_width, old_height):
@@ -46,9 +53,10 @@ def maxpect(image_ratio, old_width, old_height):
     return (new_width, new_height)
 
 def init():
-    # Initialize the camera and Haar cascades
+    # Initialize the camera and Haar cascades as global variables
     global face_cascade, eye_cascade, capture
     global frame_width, frame_height
+    global fps
 
     # Load up the sample Haar cascades from opencv-data (or current directory)
     for path in ('.', 'haarcascades', '/usr/local/share/opencv/haarcascades/',
@@ -74,7 +82,7 @@ def init():
         print("Huh. Video device #0 didn't open properly. Dying.")
         exit(1)
 
-    # Set camera to max resolution -- too slow and unneeded?
+    # Set camera to max resolution
     capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 100000)
     capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT,100000)
 
@@ -85,6 +93,9 @@ def init():
     print("Output image size will be %d x %d\n" %
           maxpect(image_ratio, frame_width, frame_height))
 
+    # Read at least one image before starting the FPS counter 
+    capture.read()
+    fps=FPS()
 
 oldfaces=None
 oldeyes=None
@@ -182,21 +193,33 @@ def main():
         (rv, original) = capture.read()
         if (not rv): break
 
+        fps.incrementFrames()
+
         # Downscale image to make findtheface() faster
         img = cv2.resize(
             original, maxpect(frame_width/frame_height, downscale, downscale))
         imgscale=float(original.shape[0])/img.shape[0]
 
+        # Find the face and eyes using the Haar cascade
         (face, eyes) = findtheface(img)
 
+        # If both are found, center on the eyes and scale
         if (face is not None and eyes is not None):
             img=centerandscale(img, face[0], eyes[0])
 
+        # Crop to the proper aspect ratio
         img=crop(img)
 
-        cv2.imshow("Hit space to save passport.jpg, q to quit", cv2.flip(img,1))
-        c = chr(cv2.waitKey(25) & 0xFF)
-        if (c == 'q' or c == '\x1b'):
+        # Show the image (and frames per second)
+        cv2.imshow(title, cv2.flip(img,1))
+        if (fps.framecount % 10 == 0):
+            eprint('%.2f fps' % fps.getFPS(), end='\r')
+            fps.reset()
+
+        # Show image and wait for a key
+        c = chr(cv2.waitKey(1) & 0xFF)
+
+        if (c == 'q' or c == '\x1b'): 		 # q or ESC to quit
             break
         if (c == ' ' or c=='p' or c=='s'):       # Print a screenshot
             img=centerandscale(original,
