@@ -28,6 +28,7 @@ from fps import FPS
 from eprint import eprint
 
 
+# Constants
 blue  = (255,0,0)
 green = (0,255,0)
 red   = (0,0,255)
