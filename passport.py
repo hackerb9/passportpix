@@ -60,6 +60,10 @@ def maxpect(image_ratio, old_width, old_height):
     return (new_width, new_height)
 
 def init():
+    # Create a window and make it fullscreen
+    cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+
     # Initialize the camera and Haar cascades as global variables
     global face_cascade, eye_cascade, capture
     global frame_width, frame_height, frame_downscale
