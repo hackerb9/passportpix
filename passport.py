@@ -1,12 +1,5 @@
 #!/usr/bin/python2
-import cv2 as cv2
-import numpy as np
-
-# My files
-from fps import FPS
-from eprint import eprint
-
-# CONSTANTS
+# CONFIGURABLE CONSTANTS
 
 # Width to Height Ratio of required final image size, e.g., 33mm / 48mm
 image_ratio=33.0/48.0 
@@ -24,6 +17,15 @@ camera_rotation=0
 # This is used both to speed up the Haar cascade and for display on the screen.
 # It does not affect the final output image resolution. 
 downscale=320
+
+######################################################################
+
+import cv2 as cv2
+import numpy as np
+
+# My files
+from fps import FPS
+from eprint import eprint
 
 
 blue  = (255,0,0)
