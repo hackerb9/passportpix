@@ -15,7 +15,7 @@ image_ratio=33.0/48.0
 chin_height_ratio=7.0/48.0
 
 # Which camera to open (first is 0)
-camera_device=1
+camera_device=0
 
 # What resolution in pixels to downscale the image to (max width, height)
 # This is used both to speed up the Haar cascade and for display on the screen.
