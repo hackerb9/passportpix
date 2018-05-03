@@ -13,6 +13,9 @@ chin_height_ratio=7.0/48.0
 # Which camera to open (first is 0)
 camera_device=0
 
+# What resolution in pixels to downscale the image to (max width, height)
+downscale=640
+
 
 blue  = (255,0,0)
 green = (0,255,0)
@@ -179,11 +182,11 @@ def main():
         (rv, original) = capture.read()
         if (not rv): break
 
-        img = cv2.resize(original,
-                         maxpect(frame_width/frame_height, 640,640))
+        # Downscale image to make findtheface() faster
+        img = cv2.resize(
+            original, maxpect(frame_width/frame_height, downscale, downscale))
         imgscale=float(original.shape[0])/img.shape[0]
 
-#        img=original.copy()
         (face, eyes) = findtheface(img)
 
         if (face is not None and eyes is not None):
