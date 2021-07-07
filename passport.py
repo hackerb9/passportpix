@@ -62,7 +62,7 @@ def maxpect(image_ratio, old_width, old_height):
 def init():
     # Create a window and make it fullscreen
     cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
-    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     # Initialize the camera and Haar cascades as global variables
     global face_cascade, eye_cascade, capture
@@ -94,11 +94,11 @@ def init():
         exit(1)
 
     # Set camera to max resolution
-    capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 100000)
-    capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT,100000)
+    capture.set(cv2.CAP_PROP_FRAME_WIDTH, 100000)
+    capture.set(cv2.CAP_PROP_FRAME_HEIGHT,100000)
 
-    frame_width=float(capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
-    frame_height=float(capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+    frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     if (camera_rotation==1 or camera_rotation==3):
         frame_width, frame_height = frame_height, frame_width
