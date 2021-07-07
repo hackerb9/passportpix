@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # CONFIGURABLE CONSTANTS
 
 # Width to Height Ratio of required final image size, e.g., 33mm / 48mm
@@ -169,7 +169,10 @@ def findtheface(img):
         else:
             return (oldfaces, oldeyes)
 
-def centerandscale(img, (x, y, w, h), (ex,ey,ew,eh)):
+def centerandscale(img, x_y_w_h, ex_ey_ew_eh):
+    x,y,w,h = x_y_w_h
+    ex,ey,ew,eh = ex_ey_ew_eh
+
     # Given the image and bounding boxes for the face and eyes,
     # recenter the image and scale it so the eyes are in the right place.
 
