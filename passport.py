@@ -16,7 +16,9 @@ camera_rotation=0
 # What resolution in pixels to downscale the image to (max width, height)
 # This is used both to speed up the Haar cascade and for display on the screen.
 # It does not affect the final output image resolution. 
+# Set to 0 to not downscale. 
 downscale=320
+downscale=0
 
 ######################################################################
 
@@ -67,7 +69,7 @@ def init():
     # Initialize the camera and Haar cascades as global variables
     global face_cascade, eye_cascade, capture
     global frame_width, frame_height, frame_downscale
-    global fps
+    global fps, downscale
 
     # Load up the sample Haar cascades from opencv-data (or current directory)
     for path in ('.', 'haarcascades', '/usr/local/share/opencv/haarcascades/',
@@ -124,6 +126,9 @@ def init():
     print("Output image size will be %d x %d" %
           maxpect(image_ratio, frame_width, frame_height))
 
+    # Allow setting downscale to 0 to not downscale the image at all
+    if not downscale:
+        downscale=int(min(frame_width, frame_height))
 
     # Downscaled (width, height) for Haar processing and display.
     # (Same aspect ratio, but fits in a square of length downscale).
