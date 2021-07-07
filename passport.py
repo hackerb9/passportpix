@@ -90,8 +90,16 @@ def init():
     # Open the camera
     capture = cv2.VideoCapture(camera_device)
     if (not capture.isOpened()):
-        print("Huh. Video device #0 didn't open properly. Dying.")
+        print("Oops. Video device %d didn't open properly. Dying."
+              % (camera_device))
         exit(1)
+
+    print("Successfully opened video device %d using %s."
+          % (camera_device, capture.getBackendName()))
+        
+    # Instead of returning an error code, thrown an exception on errors. 
+    capture.setExceptionMode(True)
+
 
     # Set camera to max resolution
     capture.set(cv2.CAP_PROP_FRAME_WIDTH, 100000)
@@ -99,6 +107,12 @@ def init():
 
     frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    if (frame_width==0 or frame_height==0):
+        print("Error. Video device #%d returned resolution of %d x %d. Dying."
+              % (camera_device, frame_width, frame_height))
+        exit(1)
+        
 
     if (camera_rotation==1 or camera_rotation==3):
         frame_width, frame_height = frame_height, frame_width
