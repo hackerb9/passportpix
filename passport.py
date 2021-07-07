@@ -101,9 +101,11 @@ def init():
     capture.setExceptionMode(True)
 
 
-    # Set camera to max resolution
-    capture.set(cv2.CAP_PROP_FRAME_WIDTH, 100000)
-    capture.set(cv2.CAP_PROP_FRAME_HEIGHT,100000)
+    # Set camera to max resolution.
+    # 	Oops, this works with some backends but dies for others. 
+    # 	Best to not muck with the resolution.
+#    capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
+#    capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
 
     frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
