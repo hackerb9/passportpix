@@ -1,10 +1,15 @@
 #!/usr/bin/python3
 # CONFIGURABLE CONSTANTS
-global image_ratio, chin_height_ratio, camera_device, camera_rotation
+global photo_width, photo_height, photo_aspect
+global chin_height_ratio
+global camera_device, camera_rotation
 global downscale, frame_downscale
 
-# Width to Height Ratio of required final image size, e.g., 33mm / 48mm
-image_ratio=33.0/48.0 
+# Width to Height Ratio of required final photo size, e.g., 33mm / 48mm
+# US Passport is 2in / 2in
+photo_width=2.0
+photo_height=2.0
+photo_aspect=photo_width/photo_height
 
 # Distance from chin to bottom of picture divided by picture length
 chin_height_ratio=7.0/48.0
@@ -15,7 +20,7 @@ camera_device=0
 # Is camera on its side? 0 == nope, 1 == 90, 2 == 180, 3 == 270.
 camera_rotation=0
 
-# What resolution in pixels to downscale the image to (max width, height)
+# Max resolution (in pixels) to downscale the image to before processing. 
 # This is used both to speed up the Haar cascade and for display on the screen.
 # It does not affect the final output image resolution. 
 # Set to 0 to not downscale.  A value of 320 is reasonable for slow machines.
@@ -40,26 +45,28 @@ red   = (0,0,255)
 title = "Hit space to save passport.jpg, q to quit"
 
 
-def maxpect(image_ratio, old_width, old_height):
-    # Rescale camera size to the maximum aspect ratio it'll fit.
-    # Input: image_ratio == desired width/height
+def maxpect(photo_aspect, old_width, old_height):
+    # Calculate the maximum frame size that maintains the aspect ratio.
+    #
+    # Input: photo_aspect == desired width/height
     #	     old_width, old_height == current width/height
     # Output: (new_width, new_height)
-    #
-    # If old_width or old_height == 0, then 320 pixels will be used.
+
 
     # Testing. Should this bomb out on zero frame size?
     if ( old_width <= 0) or (old_height <= 0): return None
 
+    # TESTING
+    # If old_width or old_height == 0, then 320 pixels will be used.
     if ( old_width <= 0):  old_width = 320
     if (old_height <= 0): old_height = 320
 
-    if (image_ratio < old_width/old_height):
+    if (photo_aspect < old_width/old_height):
         new_height=old_height
-        new_width=int(old_height*image_ratio)
+        new_width=int(old_height*photo_aspect)
     else:
         new_width=old_width
-        new_height=int(old_width/image_ratio)
+        new_height=int(old_width/photo_aspect)
 
     if (new_width>old_width):
         new_height=new_height*old_width/new_width
@@ -139,12 +146,11 @@ def init():
     print("Capturing at %d x %d" % (frame_width, frame_height) )
 
     print("Output image size will be %d x %d" %
-          maxpect(image_ratio, frame_width, frame_height))
+          maxpect(photo_aspect, frame_width, frame_height))
 
     # frame_downscale is the (width, height) for Haar processing and display.
     # (Same aspect ratio as the frame_width/frame_height, but fits in
     # a square of length downscale).
-    # See also the 'downscale' global variable at the top of this file.
     recalculate_frame_downscale(downscale)
 
     # Read at least one image before starting the FPS counter 
@@ -238,10 +244,10 @@ def centerandscale(img, x_y_w_h, ex_ey_ew_eh):
     return img
 
 def crop(img):
-    # Given an image, and the global variable image_ratio
+    # Given an image, and the global variable photo_aspect,
     # return image cropped to correct aspect ratio, centered on the original.
     height, width, channels = img.shape
-    (final_width, final_height) = maxpect(image_ratio, width, height)
+    (final_width, final_height) = maxpect(photo_aspect, width, height)
     tx=(final_width-width)/2
     ty=(final_height-height)/2
     M = np.float32([[1,0,tx],[0,1,ty]])
@@ -251,23 +257,25 @@ def crop(img):
 def recalculate_frame_downscale(downscale):
     # Sets frame_downscale based on frame_width, frame_height, and downscale.
 
-    # frame_width/height is the size of the video capture frame.
-    # downscale is the maximum width or height that should be used. 
+    # FRAME_WIDTH, FRAME_HEIGHT is the size of the video capture frame.
+    # DOWNSCALE is the desired maximum width or height.
 
-    # frame_downscale is the (width, height) for Haar processing and display.
-    # It has the same aspect ratio as the video capture frame
-    # (frame_width / frame_height), but fits in a square of length downscale.
+    # FRAME_DOWNSCALE is the (width, height) for Haar processing and display.
+    # It retains the aspect ratio of the video capture frame
+    # (frame_width : frame_height), but fits in a square of length downscale.
+    # E.g., 
 
-    # When downscale is zero, frame_downscale will not be used, so we
-    # set it to None so it will (hopefully) cause an error upon bugs.
+    # When downscale is zero, frame_downscale is simply the frame geometry.
 
     global frame_downscale
     global frame_width, frame_height
 #    global oldfaces, oldeyes
 
     if downscale == 0:
-        frame_downscale = None
-        print("No longer downscaling images")
+        frame_downscale = (frame_width, frame_height)
+        print("Downscaling for internal processing disabled.")
+        print("Downscaled size for internal processing is now %d x %d"
+              % frame_downscale)
     else:
         frame_downscale = maxpect(frame_width/frame_height, downscale, downscale)
         print("Downscaled size for internal processing is now %d x %d"
@@ -324,7 +332,7 @@ def main():
         cv2.imshow(title, cv2.flip(img,1))
         if (fps.framecount % 10 == 0):
             eprint('%.2f fps' % fps.getFPS(), end='\r')
-            fps.reset()
+#            fps.reset()
 
         # Show image and wait for a key
         c = chr(cv2.waitKey(1) & 0xFF)
@@ -337,11 +345,14 @@ def main():
             cv2.imwrite("passport.jpg", img)
             print("Wrote image to passport.jpg")
         if (c == '1'): 
-            if downscale:
-                downscale = 0
-            else:
-                downscale = 320
+            if downscale: downscale = 0
+            else:         downscale = 320
             recalculate_frame_downscale(downscale)
+        if (c == 'f'): 
+            cv2.setWindowProperty(title,
+                                  cv2.WND_PROP_FULLSCREEN,
+                                  cv2.WINDOW_FULLSCREEN if cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN) == cv2.WINDOW_NORMAL else cv2.WINDOW_NORMAL)
+
 
     capture.release()
     cv2.destroyAllWindows()
