@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 # CONFIGURABLE CONSTANTS
+global image_ratio, chin_height_ratio, camera_device, camera_rotation
+global downscale, frame_downscale
 
 # Width to Height Ratio of required final image size, e.g., 33mm / 48mm
 image_ratio=33.0/48.0 
@@ -16,10 +18,10 @@ camera_rotation=0
 # What resolution in pixels to downscale the image to (max width, height)
 # This is used both to speed up the Haar cascade and for display on the screen.
 # It does not affect the final output image resolution. 
-# Set to 0 to not downscale. 
+# Set to 0 to not downscale.  A value of 320 is reasonable for slow machines.
 downscale=320
-downscale=0
-
+#downscale=0
+frame_downscale=None
 ######################################################################
 
 import cv2 as cv2
@@ -43,6 +45,14 @@ def maxpect(image_ratio, old_width, old_height):
     # Input: image_ratio == desired width/height
     #	     old_width, old_height == current width/height
     # Output: (new_width, new_height)
+    #
+    # If old_width or old_height == 0, then 320 pixels will be used.
+
+    # Testing. Should this bomb out on zero frame size?
+    if ( old_width <= 0) or (old_height <= 0): return None
+
+    if ( old_width <= 0):  old_width = 320
+    if (old_height <= 0): old_height = 320
 
     if (image_ratio < old_width/old_height):
         new_height=old_height
@@ -68,8 +78,8 @@ def init():
 
     # Initialize the camera and Haar cascades as global variables
     global face_cascade, eye_cascade, capture
-    global frame_width, frame_height, frame_downscale
-    global fps, downscale
+    global frame_width, frame_height
+    global fps, downscale, frame_downscale
 
     # Load up the sample Haar cascades from opencv-data (or current directory)
     for path in ('.', 'haarcascades', '/usr/local/share/opencv/haarcascades/',
@@ -90,7 +100,11 @@ def init():
         exit(1)
 
     # Open the camera
-    capture = cv2.VideoCapture(camera_device)
+    for backend in (cv2.CAP_V4L2, cv2.CAP_V4L, cv2.CAP_GPHOTO2, cv2.CAP_FFMPEG, cv2.CAP_PVAPI, cv2.CAP_GSTREAMER, None):
+        capture = cv2.VideoCapture(camera_device, cv2.CAP_V4L2)
+        if capture: break
+
+
     if (not capture.isOpened()):
         print("Oops. Video device %d didn't open properly. Dying."
               % (camera_device))
@@ -102,12 +116,14 @@ def init():
     # Instead of returning an error code, thrown an exception on errors. 
     capture.setExceptionMode(True)
 
-
     # Set camera to max resolution.
-    # 	Oops, this works with some backends but dies for others. 
-    # 	Best to not muck with the resolution.
-#    capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
-#    capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
+    # 	Oops, this works with some backends but makes others go haywire. 
+    # 	Probably best to not muck with the resolution in CV2.
+    try:
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
+    except:
+        capture = cv2.VideoCapture(camera_device)
 
     frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -117,7 +133,6 @@ def init():
               % (camera_device, frame_width, frame_height))
         exit(1)
         
-
     if (camera_rotation==1 or camera_rotation==3):
         frame_width, frame_height = frame_height, frame_width
 
@@ -126,18 +141,11 @@ def init():
     print("Output image size will be %d x %d" %
           maxpect(image_ratio, frame_width, frame_height))
 
-    # Allow setting downscale to 0 to not downscale the image at all
-    if not downscale:
-        downscale=int(min(frame_width, frame_height))
-
-    # Downscaled (width, height) for Haar processing and display.
-    # (Same aspect ratio, but fits in a square of length downscale).
-    # See 'downscale' global variable at the top of this file.
-    frame_downscale=maxpect(frame_width/frame_height, downscale, downscale)
-
-    print("Downscaled size for internal processing is %d x %d\n"
-          % frame_downscale)
-
+    # frame_downscale is the (width, height) for Haar processing and display.
+    # (Same aspect ratio as the frame_width/frame_height, but fits in
+    # a square of length downscale).
+    # See also the 'downscale' global variable at the top of this file.
+    recalculate_frame_downscale(downscale)
 
     # Read at least one image before starting the FPS counter 
     capture.read()
@@ -240,7 +248,41 @@ def crop(img):
     img = cv2.warpAffine(img,M,(final_width,final_height))
     return img
 
+def recalculate_frame_downscale(downscale):
+    # Sets frame_downscale based on frame_width, frame_height, and downscale.
+
+    # frame_width/height is the size of the video capture frame.
+    # downscale is the maximum width or height that should be used. 
+
+    # frame_downscale is the (width, height) for Haar processing and display.
+    # It has the same aspect ratio as the video capture frame
+    # (frame_width / frame_height), but fits in a square of length downscale.
+
+    # When downscale is zero, frame_downscale will not be used, so we
+    # set it to None so it will (hopefully) cause an error upon bugs.
+
+    global frame_downscale
+    global frame_width, frame_height
+#    global oldfaces, oldeyes
+
+    if downscale == 0:
+        frame_downscale = None
+        print("No longer downscaling images")
+    else:
+        frame_downscale = maxpect(frame_width/frame_height, downscale, downscale)
+        print("Downscaled size for internal processing is now %d x %d"
+              % frame_downscale)
+
+    # Invalidate found face (necessary?)
+#    oldfaces = None
+#    oldeyes = None
+
+    return 
+
+    
 def main():    
+    global downscale, frame_downscale
+
     init()
 
     while True:
@@ -254,18 +296,29 @@ def main():
             original=np.rot90(original, camera_rotation)
 
         # Downscale image to make findtheface() faster
-        img = cv2.resize(original, frame_downscale)
-        imgscale=float(original.shape[0])/img.shape[0]
+        if frame_downscale:
+            img = cv2.resize(original, frame_downscale)
+            imgscale=float(original.shape[0])/img.shape[0]
+        else:
+            img = original
+            imgscale=1
 
         # Find the face and eyes using the Haar cascade
-        (face, eyes) = findtheface(img)
+        (scaledface, scaledeyes) = findtheface(img)
 
         # If both are found, center on the eyes and scale
-        if (face is not None and eyes is not None):
-            img=centerandscale(img, face[0], eyes[0])
+        if (scaledface is not None and scaledeyes is not None):
+            if downscale:
+                face = np.dot( scaledface[0], imgscale )
+                eyes = np.dot( scaledeyes[0], imgscale )
+            else:
+                face = scaledface[0]
+                eyes = scaledeyes[0]
 
-        # Crop to the proper aspect ratio
-        img=crop(img)
+            img=centerandscale(original, face, eyes)
+
+            # Crop to the proper aspect ratio
+            img=crop(img)
 
         # Show the image (and frames per second)
         cv2.imshow(title, cv2.flip(img,1))
@@ -279,12 +332,16 @@ def main():
         if (c == 'q' or c == '\x1b'): 		 # q or ESC to quit
             break
         if (c == ' ' or c=='p' or c=='s'):       # Print a screenshot
-            img=centerandscale(original,
-                               np.dot(face[0], imgscale),
-                               np.dot(eyes[0], imgscale))
+            img=centerandscale(original, face, eyes)
             img=crop(img)
             cv2.imwrite("passport.jpg", img)
             print("Wrote image to passport.jpg")
+        if (c == '1'): 
+            if downscale:
+                downscale = 0
+            else:
+                downscale = 320
+            recalculate_frame_downscale(downscale)
 
     capture.release()
     cv2.destroyAllWindows()
