@@ -23,8 +23,8 @@ camera_rotation=0
 # Max resolution (in pixels) to downscale the image to before processing. 
 # This is used both to speed up the Haar cascade and for display on the screen.
 # It does not affect the final output image resolution. 
-# Set to 0 to not downscale.  A value of 320 is reasonable for slow machines.
-downscale=320
+# Set to 0 to not downscale.  A value of 640 is reasonable for slow machines.
+downscale=640
 #downscale=0
 frame_downscale=None
 ######################################################################
@@ -53,13 +53,8 @@ def maxpect(photo_aspect, old_width, old_height):
     # Output: (new_width, new_height)
 
 
-    # Testing. Should this bomb out on zero frame size?
+    # Bomb out on zero frame size.
     if ( old_width <= 0) or (old_height <= 0): return None
-
-    # TESTING
-    # If old_width or old_height == 0, then 320 pixels will be used.
-    if ( old_width <= 0):  old_width = 320
-    if (old_height <= 0): old_height = 320
 
     if (photo_aspect < old_width/old_height):
         new_height=old_height
@@ -79,9 +74,7 @@ def maxpect(photo_aspect, old_width, old_height):
     return (new_width, new_height)
 
 def init():
-    # Create a window and make it fullscreen
-    cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
-    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    # Initialize camera, UI window, Haar cascades, etc.
 
     # Initialize the camera and Haar cascades as global variables
     global face_cascade, eye_cascade, capture
@@ -122,15 +115,19 @@ def init():
     # Instead of returning an error code, thrown an exception on errors. 
     capture.setExceptionMode(True)
 
-    # XXXX TODO: FIX THIS TO GET MAX RESOLUTION XXXX
     # Set camera to max resolution.
-    # 	Oops, this works with some backends but makes others go haywire. 
-    # 	Probably best to not muck with the resolution in CV2.
-    # try:
-    #     capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
-    #     capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
-    # except:
-    #     capture = cv2.VideoCapture(camera_device, backend)
+    #
+    # 	NOTA BENE: this works with some backends, such as V4L2,
+    #   but makes others, such as GSTREAMER, go haywire. 
+    #
+    # This does not yet handle switching the camera to a different
+    # FOURCC format when necessary for higher resolution.
+    try:
+        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
+        capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
+    except:
+        # Gstreamer gets so confused the camera has to be reopened.
+        capture = cv2.VideoCapture(camera_device, backend)
 
     frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -156,6 +153,11 @@ def init():
     # Read at least one image before starting the FPS counter 
     capture.read()
     fps=FPS()
+
+    # Create a window. User can hit 'f' to make it fullscreen.
+    cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 0)
+    cv2.resizeWindow(title, frame_downscale)
 
     # Give some hints to the user on stdout
     print("Press space to save passport.jpg, q to quit.")
@@ -285,6 +287,87 @@ def recalculate_frame_downscale(downscale):
 
     return 
 
+def getWindowSize ( title ):
+    """OpenCV has no way to check the current windowsize except by asking
+    for a rectangle, which bizarrely sometimes fails.
+    """
+    (dummy,dummy,width,height) = cv2.getWindowImageRect(title)
+    if (width == -1 or height == -1):
+        eprint("getWindowSize Error -1, -1")
+    return (width, height)
+
+
+def kludgeResizeWindow( title, newWidth, newHeight=None ):
+    """OpenCV 4.5 has a bug where maximizing a window and unmaximizing it
+    would cause resizeWindow() to not work. This kludge was an attempt
+    to work around that by simply destroying and recreating the
+    window. It did not work. 
+
+    This bug may be fixed in OpenCV 4.6.
+
+    """
+
+    # Allow a single argument with both width and height, such as img.shape
+    if not newHeight:
+        return kludgeResizeWindow( title, newWidth[0], newWidth[1] )
+
+    if (newHeight <= 0 or newWidth <= 0):
+        return False
+
+    # If the window doesn't exist, do nothing
+    try:
+        cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN)
+    except cv2.error:
+        eprint("Hm... window '%s' doesn't exist yet?" % (title))
+        return False
+
+    # Already the right size? Do nothing.
+    if (newWidth,newHeight) == getWindowSize(title):
+        return True
+
+    # Try just simply resizing it.
+    cv2.resizeWindow(title, newWidth, newHeight)    
+
+    # Did it work?
+    if (newWidth,newHeight) == getWindowSize(title):
+        return True
+
+    # Is the window full screen? That's okay, too.
+    if cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN):
+        return True
+
+    # It failed, so workaround the bug in OpenCV.
+    size = getWindowSize(title)
+    eprint("Error", size,
+           "is not", (newWidth, newHeight))
+    if size == (-1,-1):
+        # XXX Why does OpenCV sometimes return this?
+        eprint("Ignoring size of -1 x -1")
+        return False
+
+    # XXXX this kludge doesn't work. Ugh.
+    return False
+
+    eprint("Attempting to kludge resize bug in OpenCV 4.5")
+    cv2.destroyWindow(title)
+    cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
+    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 0)
+    cv2.imshow(title, np.zeros((newWidth,newHeight)))
+    cv2.resizeWindow(title, newWidth, newHeight)
+
+    # Did kludging work?
+    size = getWindowSize(title)
+    if size == (newWidth, newHeight):
+        return True
+    else:
+        eprint("Kludging failed", size,
+                "is not", (newWidth, newHeight))
+        return False 
+        capture.release()
+        cv2.destroyAllWindows()
+        exit(-1)
+
+
     
 def main():    
     global downscale, frame_downscale
@@ -321,6 +404,8 @@ def main():
 
             # Crop to the proper aspect ratio
             img=crop(img)
+            cv2.resizeWindow(title, img.shape[0:2])
+#            kludgeResizeWindow(title, img.shape)
 
         # Show the image (and frames per second)
         cv2.imshow(title, cv2.flip(img,1))
@@ -329,9 +414,10 @@ def main():
             fps.reset()
 
         # Show image and wait for a key
-        c = chr(cv2.waitKey(1) & 0xFF)
+        k = cv2.waitKey(1)
+        c = chr(k & 0xFF)
 
-        if (c == '\xFF'):       # No key hit, wait timed out.
+        if (k == -1):           # No key hit, wait timed out.
             continue
 
         elif (c == 'q' or c == '\x1b'): 	# q or ESC to quit
@@ -349,19 +435,36 @@ def main():
             else:
                 eprint('Error: No face detected yet!\a')
 
-        elif (c == '1'):          		# Try lower res for speed
-            if downscale: downscale = 0
-            else:         downscale = 320
+        elif (ord('0') <= ord(c) and ord(c) <= ord('9')  ): 
+            # Try lower res for speed
+            if (c == '1'):   downscale = 160
+            elif (c == '2'): downscale = 320
+            elif (c == '3'): downscale = 640
+            elif (c == '4'): downscale = 960
+            elif (c == '5'): downscale = 1280
+            else:            downscale = 0
             recalculate_frame_downscale(downscale)
+            cv2.resizeWindow( title, frame_downscale )
 
         elif (c == 'f'):          		# Toggle full screen
-            cv2.setWindowProperty(
-                title, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN
-                if cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN) == cv2.WINDOW_NORMAL
-                else cv2.WINDOW_NORMAL)
+            isFull = cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 1 - isFull)
+
+        elif (c == '*'):     # test resize bug in OpenCV 4.5, fixed in 4.6
+            cv2.resizeWindow( title, (320, 240) )
+
+        elif (c == '?'):        # debugging
+            print("rectangle", cv2.getWindowImageRect(title))
+            print("fullscreen: ",cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN))
+            print("autosize: ",cv2.getWindowProperty(title, cv2.WND_PROP_AUTOSIZE))
+            print("aspect ratio: ",cv2.getWindowProperty(title, cv2.WND_PROP_ASPECT_RATIO))
+            print("opengl: ",cv2.getWindowProperty(title, cv2.WND_PROP_OPENGL))
+            print("visible: ",cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE))
+            print("topmost: ",cv2.getWindowProperty(title, cv2.WND_PROP_TOPMOST))
+
 
         else:
-            eprint('Unknown key %c (%x)' % (c, ord(c)))
+            eprint('Unknown key %c (%x)' % (c, k))
 
     # End of main loop
     capture.release()
@@ -370,3 +473,18 @@ def main():
 
 main()
 
+
+# Notes to self about OpenCV's unnecessarily confusing window properties.
+# WND_PROP_FULLSCREEN 
+#     fullscreen property (can be WINDOW_NORMAL, 0, or WINDOW_FULLSCREEN, 1).
+# WND_PROP_AUTOSIZE 
+#     autosize property (can be WINDOW_NORMAL, 0, or WINDOW_AUTOSIZE, 1).
+# WND_PROP_ASPECT_RATIO 
+#     window's aspect ration (can be WINDOW_FREERATIO or WINDOW_KEEPRATIO).
+# WND_PROP_OPENGL 
+#     opengl support.
+# WND_PROP_VISIBLE 
+#     checks whether the window exists and is visible
+# WND_PROP_TOPMOST 
+#     property to toggle normal window being topmost or not 
+#
