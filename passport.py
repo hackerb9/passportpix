@@ -107,7 +107,7 @@ def init():
         exit(1)
 
     # Open the camera, but don't use GSTREAMER.
-    for backend in (cv2.CAP_GPHOTO2, cv2.CAP_V4L2, cv2.CAP_V4L, cv2.CAP_FFMPEG, cv2.CAP_PVAPI, cv2.CAP_GSTREAMER, None):
+    for backend in (cv2.CAP_DSHOW, cv2.CAP_GPHOTO2, cv2.CAP_V4L2, cv2.CAP_V4L, cv2.CAP_FFMPEG, cv2.CAP_PVAPI, cv2.CAP_GSTREAMER, None):
         capture = cv2.VideoCapture(camera_device, backend)
         if capture and capture.isOpened(): break
 
@@ -122,14 +122,15 @@ def init():
     # Instead of returning an error code, thrown an exception on errors. 
     capture.setExceptionMode(True)
 
+    # XXXX TODO: FIX THIS TO GET MAX RESOLUTION XXXX
     # Set camera to max resolution.
     # 	Oops, this works with some backends but makes others go haywire. 
     # 	Probably best to not muck with the resolution in CV2.
-    try:
-        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
-        capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
-    except:
-        capture = cv2.VideoCapture(camera_device, backend)
+    # try:
+    #     capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
+    #     capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
+    # except:
+    #     capture = cv2.VideoCapture(camera_device, backend)
 
     frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
