@@ -296,78 +296,6 @@ def getWindowSize ( title ):
         eprint("getWindowSize Error -1, -1")
     return (width, height)
 
-
-def kludgeResizeWindow( title, newWidth, newHeight=None ):
-    """OpenCV 4.5 has a bug where maximizing a window and unmaximizing it
-    would cause resizeWindow() to not work. This kludge was an attempt
-    to work around that by simply destroying and recreating the
-    window. It did not work. 
-
-    This bug may be fixed in OpenCV 4.6.
-
-    """
-
-    # Allow a single argument with both width and height, such as img.shape
-    if not newHeight:
-        return kludgeResizeWindow( title, newWidth[0], newWidth[1] )
-
-    if (newHeight <= 0 or newWidth <= 0):
-        return False
-
-    # If the window doesn't exist, do nothing
-    try:
-        cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN)
-    except cv2.error:
-        eprint("Hm... window '%s' doesn't exist yet?" % (title))
-        return False
-
-    # Already the right size? Do nothing.
-    if (newWidth,newHeight) == getWindowSize(title):
-        return True
-
-    # Try just simply resizing it.
-    cv2.resizeWindow(title, newWidth, newHeight)    
-
-    # Did it work?
-    if (newWidth,newHeight) == getWindowSize(title):
-        return True
-
-    # Is the window full screen? That's okay, too.
-    if cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN):
-        return True
-
-    # It failed, so workaround the bug in OpenCV.
-    size = getWindowSize(title)
-    eprint("Error", size,
-           "is not", (newWidth, newHeight))
-    if size == (-1,-1):
-        # XXX Why does OpenCV sometimes return this?
-        eprint("Ignoring size of -1 x -1")
-        return False
-
-    # XXXX this kludge doesn't work. Ugh.
-    return False
-
-    eprint("Attempting to kludge resize bug in OpenCV 4.5")
-    cv2.destroyWindow(title)
-    cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
-    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 0)
-    cv2.imshow(title, np.zeros((newWidth,newHeight)))
-    cv2.resizeWindow(title, newWidth, newHeight)
-
-    # Did kludging work?
-    size = getWindowSize(title)
-    if size == (newWidth, newHeight):
-        return True
-    else:
-        eprint("Kludging failed", size,
-                "is not", (newWidth, newHeight))
-        return False 
-        capture.release()
-        cv2.destroyAllWindows()
-        exit(-1)
-
-
     
 def main():    
     global downscale, frame_downscale
@@ -405,7 +333,6 @@ def main():
             # Crop to the proper aspect ratio
             img=crop(img)
             cv2.resizeWindow(title, img.shape[0:2])
-#            kludgeResizeWindow(title, img.shape)
 
         # Show the image (and frames per second)
         cv2.imshow(title, cv2.flip(img,1))
