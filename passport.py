@@ -106,11 +106,10 @@ def init():
         print("\tcp -a /usr/share/opencv/haarcascades .")
         exit(1)
 
-    # Open the camera
-    for backend in (cv2.CAP_V4L2, cv2.CAP_V4L, cv2.CAP_GPHOTO2, cv2.CAP_FFMPEG, cv2.CAP_PVAPI, cv2.CAP_GSTREAMER, None):
-        capture = cv2.VideoCapture(camera_device, cv2.CAP_V4L2)
-        if capture: break
-
+    # Open the camera, but don't use GSTREAMER.
+    for backend in (cv2.CAP_GPHOTO2, cv2.CAP_V4L2, cv2.CAP_V4L, cv2.CAP_FFMPEG, cv2.CAP_PVAPI, cv2.CAP_GSTREAMER, None):
+        capture = cv2.VideoCapture(camera_device, backend)
+        if capture and capture.isOpened(): break
 
     if (not capture.isOpened()):
         print("Oops. Video device %d didn't open properly. Dying."
@@ -130,7 +129,7 @@ def init():
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
     except:
-        capture = cv2.VideoCapture(camera_device)
+        capture = cv2.VideoCapture(camera_device, backend)
 
     frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -269,27 +268,28 @@ def recalculate_frame_downscale(downscale):
 
     global frame_downscale
     global frame_width, frame_height
-#    global oldfaces, oldeyes
+    global oldfaces, oldeyes
 
     if downscale == 0:
-        frame_downscale = (frame_width, frame_height)
-        print("Downscaling for internal processing disabled.")
-        print("Downscaled size for internal processing is now %d x %d"
-              % frame_downscale)
+        frame_downscale = (int(frame_width), int(frame_height))
+        print("Downscaling for internal processing disabled. Using %d x %d." % frame_downscale)
     else:
         frame_downscale = maxpect(frame_width/frame_height, downscale, downscale)
-        print("Downscaled size for internal processing is now %d x %d"
+        print("Downscaled size for internal processing is now %d x %d."
               % frame_downscale)
 
-    # Invalidate found face (necessary?)
-#    oldfaces = None
-#    oldeyes = None
+    # Invalidate found face
+    oldfaces = None
+    oldeyes = None
 
     return 
 
     
 def main():    
     global downscale, frame_downscale
+
+    face = None
+    eyes = None
 
     init()
 
@@ -304,26 +304,19 @@ def main():
             original=np.rot90(original, camera_rotation)
 
         # Downscale image to make findtheface() faster
-        if frame_downscale:
+        if downscale:
             img = cv2.resize(original, frame_downscale)
-            imgscale=float(original.shape[0])/img.shape[0]
         else:
-            img = original
-            imgscale=1
+            img = original.copy()
 
         # Find the face and eyes using the Haar cascade
         (scaledface, scaledeyes) = findtheface(img)
 
         # If both are found, center on the eyes and scale
         if (scaledface is not None and scaledeyes is not None):
-            if downscale:
-                face = np.dot( scaledface[0], imgscale )
-                eyes = np.dot( scaledeyes[0], imgscale )
-            else:
-                face = scaledface[0]
-                eyes = scaledeyes[0]
-
-            img=centerandscale(original, face, eyes)
+            face = scaledface[0]
+            eyes = scaledeyes[0]
+            img=centerandscale(img, face, eyes)
 
             # Crop to the proper aspect ratio
             img=crop(img)
@@ -332,28 +325,44 @@ def main():
         cv2.imshow(title, cv2.flip(img,1))
         if (fps.framecount % 10 == 0):
             eprint('%.2f fps' % fps.getFPS(), end='\r')
-#            fps.reset()
+            fps.reset()
 
         # Show image and wait for a key
         c = chr(cv2.waitKey(1) & 0xFF)
 
-        if (c == 'q' or c == '\x1b'): 		 # q or ESC to quit
+        if (c == '\xFF'):       # No key hit, wait timed out.
+            continue
+
+        elif (c == 'q' or c == '\x1b'): 	# q or ESC to quit
             break
-        if (c == ' ' or c=='p' or c=='s'):       # Print a screenshot
-            img=centerandscale(original, face, eyes)
-            img=crop(img)
-            cv2.imwrite("passport.jpg", img)
-            print("Wrote image to passport.jpg")
-        if (c == '1'): 
+
+        elif (c == ' ' or c=='p' or c=='s'):    # Save a screenshot
+            if (oldfaces is not None and oldeyes is not None):
+                imgscale=float(original.shape[0])/img.shape[0]
+                f = np.dot( face, imgscale )
+                e = np.dot( eyes, imgscale )
+                img=centerandscale(original, f, e)
+                img=crop(img)
+                cv2.imwrite("passport.jpg", img)
+                print("Wrote image to passport.jpg")
+            else:
+                eprint('Error: No face detected yet!\a')
+
+        elif (c == '1'):          		# Try lower res for speed
             if downscale: downscale = 0
             else:         downscale = 320
             recalculate_frame_downscale(downscale)
-        if (c == 'f'): 
-            cv2.setWindowProperty(title,
-                                  cv2.WND_PROP_FULLSCREEN,
-                                  cv2.WINDOW_FULLSCREEN if cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN) == cv2.WINDOW_NORMAL else cv2.WINDOW_NORMAL)
 
+        elif (c == 'f'):          		# Toggle full screen
+            cv2.setWindowProperty(
+                title, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN
+                if cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN) == cv2.WINDOW_NORMAL
+                else cv2.WINDOW_NORMAL)
 
+        else:
+            eprint('Unknown key %c (%x)' % (c, ord(c)))
+
+    # End of main loop
     capture.release()
     cv2.destroyAllWindows()
 
