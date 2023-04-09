@@ -399,19 +399,3 @@ def main():
 
 
 main()
-
-
-# Notes to self about OpenCV's unnecessarily confusing window properties.
-# WND_PROP_FULLSCREEN 
-#     fullscreen property (can be WINDOW_NORMAL, 0, or WINDOW_FULLSCREEN, 1).
-# WND_PROP_AUTOSIZE 
-#     autosize property (can be WINDOW_NORMAL, 0, or WINDOW_AUTOSIZE, 1).
-# WND_PROP_ASPECT_RATIO 
-#     window's aspect ration (can be WINDOW_FREERATIO or WINDOW_KEEPRATIO).
-# WND_PROP_OPENGL 
-#     opengl support.
-# WND_PROP_VISIBLE 
-#     checks whether the window exists and is visible
-# WND_PROP_TOPMOST 
-#     property to toggle normal window being topmost or not 
-#
