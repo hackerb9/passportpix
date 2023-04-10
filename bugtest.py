@@ -1,9 +1,16 @@
 #!/usr/bin/python3
 
-# Exercise the fullscreen bug in OpenCV 4.6
+# Exercise the fullscreen peculiarity (bug?) in OpenCV 4.6.
+#
+# Keys:
+# 	change the image size: 		1 to 9, or 0 for vidcap size.
+# 	resize window to image size: 	r
+#	toggle fullscreen:		f
+#	get window properties		g
+# 	resize then enable fullscreen	t
+
 
 import cv2 as cv2
-from cv2 import *            # For CAP_PROP_...
 import numpy as np
 
 # CONSTANTS
@@ -12,17 +19,35 @@ green = (0,255,0)
 red   = (0,0,255)
 title = "Haarpy! Hit 'q' to quit."
 
-print ("""Test of High-level GUI bugs in OpenCV 4.5 and 4.6. Interaction
-between fullscreen and resize is unclear and perhaps buggy.
+print ("""Test of High-level GUI bugs in OpenCV 4.5 and 4.6.
+Keys:
+        change the image size:          1 to 9, or 0 for vidcap size.
+        resize window to image size:    r
+        toggle fullscreen:              f
+        get window properties           g
+        resize then enable fullscreen   t
+
+Interaction between fullscreen and resize is unclear and likely buggy.
 
 In 4.6, resizing the window while in fullscreen will turn off
 fullscreen. It ought to stay in fullscreen and remember the new window
-size for when fullscreen is turned off. To test, press 5 r and notice
-that resizing the window to 500x500 works correctly when not
-fullscreen. Now press f 6 r and notice that as soon as resizeWindow()
-is called, fullscreen was turned off. Now try f 6 shift+R, which
-attempts to enable fullscreen mode immediately after resizeWindow()
-and note that it fails: the screen stays windowed.
+size for when fullscreen is turned off. Additionally, attempting to
+programmatically work around OpenCV turning off fullscreen by turning
+it back on fails, likely because OpenCV's resizeWindow is running
+asynchronously..
+
+To test:
+
+1. Press 5 r and notice that resizing the window to 500x500
+   works correctly when not fullscreen.
+
+2. Press f 6 r and notice that as soon as resizeWindow() is called,
+   fullscreen was turned off. It should have stayed fullscreen.
+
+3. Now try f b, which attempts to both resize the window and enable
+   fullscreen mode immediately afterward. Note that it fails: the
+   screen stays windowed, probably due to a race with some
+   asynchronous GUI process caused by resizeWindow().
 
 In 4.5, windows cannot be made resized smaller. To test, press 5 r 6 r
 and notice that the window can resize larger. Now press 4 r 3 r, the
@@ -50,18 +75,20 @@ if (not capture.isOpened()):
 
  # Capture at highest resolution. (Gstreamer backend is buggy).
 if (capture.getBackendName() != "GSTREAMER"):
-    capture.set(CAP_PROP_FRAME_WIDTH,  100000)
-    capture.set(CAP_PROP_FRAME_HEIGHT, 100000)
+    capture.set(cv2.CAP_PROP_FRAME_WIDTH,  100000)
+    capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 100000)
 
 # Create a window that can be made fullscreen
 cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
 
 # Default size to crop image shown on screen
-cropsize=320
+crop_size=320
 
 while True:
     (rv, img) = capture.read()
     if (not rv): break
+
+    capture_size = img.shape[0:2]
 
     # Find a face (can return multiple faces)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -79,9 +106,8 @@ while True:
             cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),green,5)
 
     # Crop image
-    height, width, channels = img.shape
-    desired_width, desired_height = (cropsize, cropsize) \
-        if cropsize else (width, height)
+    height, width = capture_size
+    desired_height, desired_width = (crop_size, crop_size) if crop_size else capture_size
     tx = ( desired_width-width ) / 2
     ty = ( desired_height-height ) / 2
     M = np.float32( [[1,0,tx], [0,1,ty]] )
@@ -111,9 +137,12 @@ while True:
         print( f"\tToggling fullscreen from {isFull} to {1-isFull}." )
         cv2.setWindowProperty( title, cv2.WND_PROP_FULLSCREEN, 1 - isFull )
 
-    elif (ord('0') <= ord(c) and ord(c) <= ord('9')  ): # Change cropsize
-        cropsize = int(c) * 100
-        print (f"\tCropping to {cropsize} x {cropsize}")
+    elif (ord('0') <= ord(c) and ord(c) <= ord('9')  ): # Change crop_size
+        crop_size = int(c) * 100
+        if crop_size == 0:
+            crop_size = max( capture_size )
+
+        print (f"\tCropping to {crop_size} x {crop_size}")
 
     elif (c == 'g'):          		# Get current status
         print( f"\tGet current window info: ", end=None )
@@ -122,14 +151,14 @@ while True:
         (dummy, dummy, width, height) = cv2.getWindowImageRect( title )
         print( f"Size is {width, height}" )
 
-    elif (c == 'r'):          		# Resize window to cropsize
+    elif (c == 'r'):          		# Resize window to crop_size
         (dummy, dummy, width, height) = cv2.getWindowImageRect(title)
-        print( f"\tResizing from {width, height} to {cropsize, cropsize}." )
-        cv2.resizeWindow( title, (cropsize, cropsize) )
+        print( f"\tResizing from {width, height} to {crop_size, crop_size}." )
+        cv2.resizeWindow( title, (crop_size, crop_size) )
 
-    elif (c == 'R'):          		# Resize and enable fullscreen
-        print( f"\tResizing to {cropsize, cropsize} and enabling fullscreen." )
-        cv2.resizeWindow( title, (cropsize, cropsize) )
+    elif (c == 'b'):          		# Both resize and enable fullscreen
+        print( f"\tResizing to {crop_size, crop_size} and enabling fullscreen." )
+        cv2.resizeWindow( title, (crop_size, crop_size) )
         cv2.setWindowProperty( title, cv2.WND_PROP_FULLSCREEN, 1 )
 
 # When user hits 'q', main loop exits
