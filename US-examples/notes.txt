@@ -1,0 +1,9 @@
+"Good" images for a US Passport appear to be based on eye position
+
+Left eye: 5/12 of the way from the left edge
+Right eye: 7/12 of the way from the left edge
+Both eyes: 7/12 of the way from the bottom edge
+
+The distance between the eyes is 2/12th of the image length, so
+we can use that for scaling the video capture.
+
