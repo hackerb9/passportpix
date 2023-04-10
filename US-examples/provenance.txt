@@ -1,0 +1,3 @@
+wget -nc https://tsg.phototool.state.gov/resources/images/img_{good,bad}{,_{sizepos,exp,glasses,attire,shadow,background,res,child,obstruct}}_{1,2}{1,2}.jpg
+
+Mon Apr 10 03:18:18 PM UTC 2023
