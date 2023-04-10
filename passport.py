@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # CONFIGURABLE CONSTANTS - .-. -.--
 global photo_width, photo_height, photo_aspect
+global eye_distance, eye_height
 global chin_height_ratio
 global camera_device, camera_rotation
 global downscale, frame_downscale
@@ -11,7 +12,16 @@ photo_width=2.0
 photo_height=2.0
 photo_aspect=photo_width/photo_height
 
-# Distance from chin to bottom of picture divided by picture length
+# Distance between eyes as a fraction of the picture width (US)
+eye_distance = 2.0 / 12.0
+
+# Distance from eyes to the bottom of the picture divided by picture length (US)
+eye_height = 7.0 / 12.0
+
+# Distance from eyes to the bottom of the picture divided by picture length (CN)
+#eye_height = 24.0 / 48.0
+
+# Distance from chin to bottom of picture divided by picture length (CN)
 chin_height_ratio=7.0/48.0
 
 # Which camera to open (first is 0)
