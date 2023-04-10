@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# CONFIGURABLE CONSTANTS
+# CONFIGURABLE CONSTANTS - .-. -.--
 global photo_width, photo_height, photo_aspect
 global chin_height_ratio
 global camera_device, camera_rotation
@@ -25,8 +25,8 @@ camera_rotation=0
 # It does not affect the final output image resolution. 
 # Set to 0 to not downscale.  A value of 640 is reasonable for slow machines.
 downscale=640
-#downscale=0
 frame_downscale=None
+
 ######################################################################
 
 import cv2 as cv2
@@ -156,8 +156,8 @@ def init():
 
     # Create a window. User can hit 'f' to make it fullscreen.
     cv2.namedWindow(title, cv2.WND_PROP_FULLSCREEN)
-    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 0)
     cv2.resizeWindow(title, frame_downscale)
+    cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 0)
 
     # Give some hints to the user on stdout
     print("Press space to save passport.jpg, q to quit.")
@@ -281,7 +281,7 @@ def recalculate_frame_downscale(downscale):
         print("Downscaled size for internal processing is now %d x %d."
               % frame_downscale)
 
-    # Invalidate found face
+    # Invalidate found face. XXX should probably just rescale them.
     oldfaces = None
     oldeyes = None
 
@@ -364,12 +364,13 @@ def main():
 
         elif (ord('0') <= ord(c) and ord(c) <= ord('9')  ): 
             # Try lower res for speed
-            if (c == '1'):   downscale = 160
+            if   (c == '1'): downscale = 160
             elif (c == '2'): downscale = 320
             elif (c == '3'): downscale = 640
             elif (c == '4'): downscale = 960
             elif (c == '5'): downscale = 1280
             else:            downscale = 0
+
             recalculate_frame_downscale(downscale)
             cv2.resizeWindow( title, frame_downscale )
 
@@ -377,10 +378,7 @@ def main():
             isFull = cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN)
             cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 1 - isFull)
 
-        elif (c == '*'):     # test resize bug in OpenCV 4.5, fixed in 4.6
-            cv2.resizeWindow( title, (320, 240) )
-
-        elif (c == '?'):        # debugging
+        elif (c == '*'):        # debugging
             print("rectangle", cv2.getWindowImageRect(title))
             print("fullscreen: ",cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN))
             print("autosize: ",cv2.getWindowProperty(title, cv2.WND_PROP_AUTOSIZE))

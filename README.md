@@ -108,7 +108,7 @@ Mostly reminders to myself.
   v4l2-ctl --list-formats-ext
   ```
 
-* To print out the current GUI properties, hit the '?' key.
+* To print out the current GUI properties, hit <kbd>*</kbd>.
 
 * OpenCV has unnecessarily confusing GUI window properties. In
   particular, it appears OpenCV was originally written using simple
