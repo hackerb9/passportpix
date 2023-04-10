@@ -7,7 +7,7 @@
 # 	resize window to image size: 	r
 #	toggle fullscreen:		f
 #	get window properties		g
-# 	resize then enable fullscreen	t
+# 	resize then enable fullscreen	b
 
 
 import cv2 as cv2
@@ -24,8 +24,8 @@ Keys:
         change the image size:          1 to 9, or 0 for vidcap size.
         resize window to image size:    r
         toggle fullscreen:              f
-        get window properties           g
-        resize then enable fullscreen   t
+        get window properties:          g
+        resize then enable fullscreen:  b
 
 Interaction between fullscreen and resize is unclear and likely buggy.
 
