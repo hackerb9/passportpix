@@ -212,73 +212,85 @@ def findtheface(img):
         roi_color = img[y:y+h, x:x+w]
         eyes = eyepair_cascade.detectMultiScale(roi_gray)
         if (len(eyes) != 1):
-            for (ex,ey,ew,eh) in eyes:
-                cv2.line(roi_color,(ex,ey),(ex+ew,ey+eh),green,1)
-                cv2.line(roi_color,(ex+ew,ey),(ex,ey+eh),green,1)
+            for e in eyes:
+                exOut(roi_color,e,green,1)
             return (oldfaces, oldeyes)
 
         # Draw a green box, if we found exactly one pair of eyes.
         cv2.rectangle(roi_color,eyes[0],green,2)
         (ex,ey,ew,eh) = eyes[0]
 
-        # Find the left and right eye separately. (Not very robust).
-        # This often hallucinates eyes or can't see them. Also, the
-        # region it finds is not as tight as eyepair_big's rectangle.
-        # In particular, it extends too high, up to the brows.
-        #
-        # To handle this, we intersect with the eyepair rectangle to
-        # find an eye that's on the proper side of the face.
-        lefteye = lefteye_cascade.detectMultiScale(roi_gray)
-        print ("Left eyes: %d" % (len(lefteye)))
-
-        left = None
-        for (lx,ly,lw,lh) in lefteye:
-            # Check each eye found and see if it is on the left side
-            # of the eye pair rectangle. 
-            left = (lx+lw/2, ly+lh/2) 	# Center of eye
-            if not isWithinLeft( left, eyes[0] ):
-                exOut(roi_color, (lx,ly,lw,lh) ,red,1)
-                print ("Rejecting left as", left)
-                left = None
-                continue
-            else:
-                print ("Accepting left as", left)
-                cv2.rectangle(roi_color,(lx,ly,lw,lh),magenta,2)
-                break
-            
-        if not left:
-            return (oldfaces, oldeyes)
-            
-        righteye = righteye_cascade.detectMultiScale(roi_gray)
-        print ("Right eyes: %d" % (len(righteye)))
-
-        right = None
-        for (lx,ly,lw,lh) in righteye:
-            # Check each eye found and see if it is on the right side
-            # of the eye pair rectangle. 
-            right = (lx+lw/2, ly+lh/2) 	# Center of eye
-            if not isWithinRight( right, eyes[0] ):
-                exOut(roi_color, (lx,ly,lw,lh) ,red,1)
-                print ("Rejecting right as", right)
-                right = None
-                continue
-            else:
-                print ("Accepting right as", right)
-                cv2.rectangle(roi_color,(lx,ly,lw,lh),magenta,2)
-                break
-            
-        if not right:
-            return (oldfaces, oldeyes)
-            
     if (len(faces)==1 and len(eyes)==1):
-        oldfaces=faces
-        oldeyes=eyes
-        return (faces, eyes)
+        (oldfaces, oldeyes) = (faces[0], eyes[0])
+        return (faces[0], eyes[0])
     else:
         if (oldfaces is None or oldeyes is None):
     	    return (None, None)
         else:
             return (oldfaces, oldeyes)
+
+
+oldleft=None
+oldright=None
+def findtheeyes(img, eye_pair):
+    global oldleft, oldright    # Cached result from previous run
+
+    # Find the left and right eye separately. (Not very robust).
+    # This often hallucinates eyes or can't see them. Also, the
+    # region it finds is not as tight as eyepair_big's rectangle.
+    # In particular, it extends too high, up to the brows.
+    #
+    # To handle this, we intersect with the eyepair rectangle to
+    # find an eye that's on the proper side of the face.
+
+    roi_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    lefteye = lefteye_cascade.detectMultiScale(roi_gray)
+
+    left = None
+    for (lx,ly,lw,lh) in lefteye:
+        # Check each eye found and see if it is on the left side
+        # of the eye pair rectangle. 
+        left = (lx+lw/2, ly+lh/2) 	# Center of eye
+        if not isWithinLeft( left, eye_pair ):
+            # Reject 
+            exOut(img, (lx,ly,lw,lh) ,red,1)
+            left = None
+            continue
+        else:
+            # Accept
+            cv2.rectangle(img,(lx,ly,lw,lh),magenta,2)
+            break
+
+    righteye = righteye_cascade.detectMultiScale(roi_gray)
+    right = None
+    for (lx,ly,lw,lh) in righteye:
+        # Check each eye found and see if it is on the right side
+        # of the eye pair rectangle. 
+        right = (lx+lw/2, ly+lh/2) 	# Center point of eye
+        if not isWithinRight( right, eye_pair ):
+            # Reject
+            exOut(img, (lx,ly,lw,lh) ,red,1)
+            right = None
+            continue
+        else:
+            # Accept
+            cv2.rectangle(img,(lx,ly,lw,lh),yellow,2)
+            break
+
+    if (left and right):
+        (oldleft, oldright) = (left, right)
+
+    return (oldleft, oldright)
+
+
+def roi(img, rect):
+    """ 
+    Given an image and a rectangle, return the 2-D slice of that image.
+    NOTE: Writing to the array returned will alter the original image. 
+    """
+    (x,y,w,h) = rect
+    return img[y:y+h, x:x+w]
 
 def centerandscale(img, x_y_w_h, ex_ey_ew_eh):
     x,y,w,h = x_y_w_h
@@ -429,13 +441,30 @@ def main():
         else:
             img = original.copy()
 
-        # Find the face and eyes using the Haar cascade
-        (scaledface, scaledeyes) = findtheface(img)
+        # Find the face and a pair of eyes using the Haar cascade
+        (face, eyes) = findtheface(img)
+
+        if (face is not None):
+            roi_color = roi(img, face)
+
+            if (eyes is not None):
+                # Find the left and right eyes using the Haar cascade
+                (left, right) = findtheeyes(roi_color, eyes)
+
+                if (left and right):
+                    iod = (right[0]-left[0]) / img.shape[0]
+                    print( "Inter-Ocular distance as fraction of image: ", iod )
+                    print( "Goal for US passport is: ", 2.0/12.0 )
+                    if (iod): print( "Slope: ", (right[1]-left[1])/(right[0]-left[0]) )
+
 
         # If both are found, center on the eyes and scale
-        if (scaledface is not None and scaledeyes is not None):
-            face = scaledface[0]
-            eyes = scaledeyes[0]
+        if (face is not None and eyes is not None):
+
+            # Find the left and right eyes using the Haar cascade
+            roi_color = roi(img, face)
+            (left, right) = findtheeyes(roi_color, eyes)
+
             img=centerandscale(img, face, eyes)
 
             # Crop to the proper aspect ratio
