@@ -49,8 +49,10 @@ from eprint import eprint
 
 # Constants
 blue  = (255,0,0)
-green = (0,255,0)
+green = (0,128,0)
 red   = (0,0,255)
+yellow   = (0,255,255)
+magenta   = (255,0,255)
 
 title = "Hit space to save passport.jpg, q to quit"
 
@@ -87,8 +89,8 @@ def init():
     # Initialize camera, UI window, Haar cascades, etc.
 
     # Initialize the camera and Haar cascades as global variables
-    global face_cascade, eye_cascade, capture
-    global frame_width, frame_height
+    global face_cascade, eyepair_cascade, lefteye_cascade, righteye_cascade
+    global capture, frame_width, frame_height
     global fps, downscale, frame_downscale
 
     # Load up the sample Haar cascades from opencv-data (or current directory)
@@ -97,11 +99,19 @@ def init():
         
         face_cascade = cv2.CascadeClassifier(
                            path + '/haarcascade_frontalface_default.xml' )
-        eye_cascade  = cv2.CascadeClassifier(
+        eyepair_cascade  = cv2.CascadeClassifier(
                            path + '/haarcascade_mcs_eyepair_big.xml' )
-        if (not face_cascade.empty() and not eye_cascade.empty()): break
+        lefteye_cascade  = cv2.CascadeClassifier(
+                           path + '/haarcascade_lefteye_2splits.xml' )
+        righteye_cascade  = cv2.CascadeClassifier(
+                           path + '/haarcascade_righteye_2splits.xml' )
 
-    if (face_cascade.empty() or eye_cascade.empty()):
+        if not (face_cascade.empty() or eyepair_cascade.empty() or
+                lefteye_cascade.empty() or righteye_cascade.empty()):
+            break
+
+    # Did we find all the 
+    if (face_cascade.empty() or eyepair_cascade.empty()):
         print("Oops, couldn't find haarcascade_frontalface_default.xml")
         print("or haarcascade_mcs_eyepair_big.xml")
         print("Please install the opencv-data package.")
@@ -173,7 +183,7 @@ def init():
     print("Press space to save passport.jpg, q to quit.")
 
 
-# Static vars for findtheface so image doesn't jump back if we lose the face.
+# Static vars to cache findtheface so image doesn't jump back if we lose the face.
 oldfaces=None
 oldeyes=None
 def findtheface(img):
@@ -187,25 +197,79 @@ def findtheface(img):
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
     for (x,y,w,h) in faces:
-        # Draw a blue box around it, if we found exactly one face.
-        if (len(faces) == 1):
-            cv2.rectangle(img,(x,y),(x+w,y+h),blue,3)
-        else:
-            cv2.line(img,(x,y),(x+w,y+h),red,1)
-            cv2.line(img,(x+w,y),(x,y+h),red,1)
+        if (len(faces) != 1):	 	# Wrong number of faces
+            cv2.line(img,(x,y),(x+w,y+h),blue,1)
+            cv2.line(img,(x+w,y),(x,y+h),blue,1)
+            eyes = None
+            continue
 
-        # Find a pair of eyes (can return multiple pairs)
+        # Draw a blue box around it, if we found exactly one face.
+        cv2.rectangle(img,(x,y),(x+w,y+h),blue,3)
+        
+        # Find a pair of eyes in this face (can return multiple pairs!)
+        # (Fairly robust)
         roi_gray = gray[y:y+h, x:x+w]
         roi_color = img[y:y+h, x:x+w]
-        eyes = eye_cascade.detectMultiScale(roi_gray)
-        for (ex,ey,ew,eh) in eyes:
-            # Draw a green box, if we found exactly one pair of eyes.
-            if (len(eyes) == 1):
-                cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),green,5)
-            else:
-                cv2.line(roi_color,(ex,ey),(ex+ew,ey+eh),red,1)
-                cv2.line(roi_color,(ex+ew,ey),(ex,ey+eh),red,1)
+        eyes = eyepair_cascade.detectMultiScale(roi_gray)
+        if (len(eyes) != 1):
+            for (ex,ey,ew,eh) in eyes:
+                cv2.line(roi_color,(ex,ey),(ex+ew,ey+eh),green,1)
+                cv2.line(roi_color,(ex+ew,ey),(ex,ey+eh),green,1)
+            return (oldfaces, oldeyes)
 
+        # Draw a green box, if we found exactly one pair of eyes.
+        cv2.rectangle(roi_color,eyes[0],green,2)
+        (ex,ey,ew,eh) = eyes[0]
+
+        # Find the left and right eye separately. (Not very robust).
+        # This often hallucinates eyes or can't see them. Also, the
+        # region it finds is not as tight as eyepair_big's rectangle.
+        # In particular, it extends too high, up to the brows.
+        #
+        # To handle this, we intersect with the eyepair rectangle to
+        # find an eye that's on the proper side of the face.
+        lefteye = lefteye_cascade.detectMultiScale(roi_gray)
+        print ("Left eyes: %d" % (len(lefteye)))
+
+        left = None
+        for (lx,ly,lw,lh) in lefteye:
+            # Check each eye found and see if it is on the left side
+            # of the eye pair rectangle. 
+            left = (lx+lw/2, ly+lh/2) 	# Center of eye
+            if not isWithinLeft( left, eyes[0] ):
+                exOut(roi_color, (lx,ly,lw,lh) ,red,1)
+                print ("Rejecting left as", left)
+                left = None
+                continue
+            else:
+                print ("Accepting left as", left)
+                cv2.rectangle(roi_color,(lx,ly,lw,lh),magenta,2)
+                break
+            
+        if not left:
+            return (oldfaces, oldeyes)
+            
+        righteye = righteye_cascade.detectMultiScale(roi_gray)
+        print ("Right eyes: %d" % (len(righteye)))
+
+        right = None
+        for (lx,ly,lw,lh) in righteye:
+            # Check each eye found and see if it is on the right side
+            # of the eye pair rectangle. 
+            right = (lx+lw/2, ly+lh/2) 	# Center of eye
+            if not isWithinRight( right, eyes[0] ):
+                exOut(roi_color, (lx,ly,lw,lh) ,red,1)
+                print ("Rejecting right as", right)
+                right = None
+                continue
+            else:
+                print ("Accepting right as", right)
+                cv2.rectangle(roi_color,(lx,ly,lw,lh),magenta,2)
+                break
+            
+        if not right:
+            return (oldfaces, oldeyes)
+            
     if (len(faces)==1 and len(eyes)==1):
         oldfaces=faces
         oldeyes=eyes
@@ -305,6 +369,40 @@ def getWindowSize ( title ):
     if (width == -1 or height == -1):
         eprint("getWindowSize Error -1, -1")
     return (width, height)
+
+def isWithin(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
+    px,py = point
+    if not ry:
+        (rx,ry,rw,rh) = rect_x_y_w_h
+    else:
+        rx = rect_x_y_w_h
+    return (rx <= px and px <= rx+rw and  ry <= py and py <= ry+rh)
+
+def isWithinLeft(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
+    if not ry:
+        (rx,ry,rw,rh) = rect_x_y_w_h
+    else:
+        rx = rect_x_y_w_h
+    return isWithin( point, rx+rw/2, ry, rw/2, rh )
+
+def isWithinRight(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
+    if not ry:
+        (rx,ry,rw,rh) = rect_x_y_w_h
+    else:
+        rx = rect_x_y_w_h
+    return isWithin( point, rx, ry, rw/2, rh )
+
+
+def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness=None):
+    if not h:
+        (x,y,w,h) = rect_x_y_w_h
+        color = color_y
+        thickness = thickness_w
+    else:
+        (x,y,w,h) = (rect_x_y_w_h, color_y, thickness_w, h)
+        
+    cv2.line(img,(x,y),(x+w,y+h),color,thickness)
+    cv2.line(img,(x+w,y),(x,y+h),color,thickness)
 
     
 def main():    
