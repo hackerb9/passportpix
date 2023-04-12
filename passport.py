@@ -2,27 +2,30 @@
 # CONFIGURABLE CONSTANTS - .-. -.--
 global photo_width, photo_height, photo_aspect
 global eye_distance, eye_height
-global chin_height_ratio
+global chin_height
 global camera_device, camera_rotation
 global downscale, frame_downscale
 
-# Width to Height Ratio of required final photo size, e.g., 33mm / 48mm
-# US Passport is 2in / 2in
+# Photo metadata (Note: not saved in .jpg file, yet)
 photo_width=2.0
 photo_height=2.0
+photo_units="in"
+
+# Width to Height Ratio of required final photo size, e.g., 33mm / 48mm
+# US Passport is 2in / 2in
 photo_aspect=photo_width/photo_height
 
-# Distance between eyes as a fraction of the picture width (US)
+# Distance between eyes as a fraction of the picture width (US Passport)
 eye_distance = 2.0 / 12.0
 
-# Distance from eyes to the bottom of the picture divided by picture length (US)
+# Distance from eyes to the bottom of the picture divided by picture length (US Passport)
 eye_height = 7.0 / 12.0
 
-# Distance from eyes to the bottom of the picture divided by picture length (CN)
+# Distance from eyes to the bottom of the picture divided by picture length (CN Visa)
 #eye_height = 24.0 / 48.0
 
-# Distance from chin to bottom of picture divided by picture length (CN)
-chin_height_ratio=7.0/48.0
+# Distance from chin to bottom of picture divided by picture length (CN Visa)
+chin_height=7.0/48.0
 
 # Which camera to open (first is 0)
 camera_device=0
@@ -190,14 +193,14 @@ def init():
 
 
 # Static vars to cache findtheface so image doesn't jump back if we lose the face.
-oldfaces=None
+oldface=None
 oldeyes=None
 def findtheface(img):
     # Given the BGR image 'img', draw boxes on it for eyes and face,
     # then return the coordinate for (face, eyes).
     # Or (None, None) if there is not exactly one face and one pair of eyes.
 
-    global oldfaces, oldeyes
+    global oldface, oldeyes
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
@@ -220,20 +223,20 @@ def findtheface(img):
         if (len(eyes) != 1):
             for e in eyes:
                 exOut(roi_color,e,green,1)
-            return (oldfaces, oldeyes)
+            return (oldface, oldeyes)
 
         # Draw a green box, if we found exactly one pair of eyes.
         cv2.rectangle(roi_color,eyes[0],green,2)
         (ex,ey,ew,eh) = eyes[0]
 
     if (len(faces)==1 and len(eyes)==1):
-        (oldfaces, oldeyes) = (faces[0], eyes[0])
+        (oldface, oldeyes) = (faces[0], eyes[0])
         return (faces[0], eyes[0])
     else:
-        if (oldfaces is None or oldeyes is None):
+        if (oldface is None or oldeyes is None):
     	    return (None, None)
         else:
-            return (oldfaces, oldeyes)
+            return (oldface, oldeyes)
 
 
 oldleft=None
@@ -311,13 +314,13 @@ def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     heightofeyes=((y+ey) + (y+ey+eh))/2.0 # Eyes are relative to face box
     chintoeyes=abs(heightofchin - heightofeyes)
 
-    # The eyes are in the middle and there is a chin_height_ratio
+    # The eyes are in the middle and there is a chin_height
     # percentage gap between chin and bottom of picture. (E.g.,
     # 1/7th). That means, the distance from the chin to the eyes,
     # chintoeyes, should be, once scaled, be equal to
-    # (1/2- chin_height_ratio) times the image height. (E.g., 5/14th).
+    # (1/2- chin_height) times the image height. (E.g., 5/14th).
 
-    scale = (0.5-chin_height_ratio) * height/chintoeyes
+    scale = (0.5-chin_height) * height/chintoeyes
     img = cv2.resize(img, None, fx=scale, fy=scale)
 
     # This is silly. How do I numptify this?
@@ -337,17 +340,22 @@ def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     img = cv2.warpAffine(img,M,(width,height))
     return img
 
-def iodtransform(img, face, left_right, right=None):
-    # Given center of left and right eyes, return a 3x2 matrix which
-    # represents the affine transform needed to map an image so that
-    # the eyes are are horizontal, at the correct eye_height, and the
-    # proper distance apart.
-    left = left_right
-    if right == None:
+def iodtransform(img, left_right, right=None):
+    # Intraocular distance transform.
+    #
+    # Given an image and the center of left and right eyes,
+    # return the image warped such that eyes are:
+    # * horizontal,
+    # * at the correct eye_height, and
+    # * the proper distance apart (eye_distance).
+
+    if right is not None:
+        left = left_right
+    else:
         (left, right) = left_right
     
-    (Lu, Lv) = left + face[0:2]
-    (Ru, Rv) = right + face[0:2]
+    (Lu, Lv) = left
+    (Ru, Rv) = right
     (h, w, channels) = img.shape
 
     Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 )
@@ -399,10 +407,7 @@ def iodtransform(img, face, left_right, right=None):
                       [ -(Rv-Lv)/Hyp, (Ru-Lu)/Hyp*scale, h - eye_height*h - Lv*scale ] ] )
 
     # print( "M\n", M )
-
-
-    img = cv2.warpAffine(img, M, (w,h))
-    return img
+    return cv2.warpAffine( img, M, (w,h) )
 
 def crop(img):
     # Given an image, and the global variable photo_aspect,
@@ -430,7 +435,7 @@ def recalculate_frame_downscale(downscale):
 
     global frame_downscale
     global frame_width, frame_height
-    global oldfaces, oldeyes
+    global oldface, oldeyes
 
     if downscale == 0:
         frame_downscale = (int(frame_width), int(frame_height))
@@ -441,7 +446,7 @@ def recalculate_frame_downscale(downscale):
               % frame_downscale)
 
     # Invalidate found face. XXX should probably just rescale them.
-    oldfaces = None
+    oldface = None
     oldeyes = None
 
     return 
@@ -525,19 +530,17 @@ def main():
                 (left, right) = findtheeyes(roi_color, eyes)
 
                 if (left is not None and right is not None):
+                    # Make left and right eye position absolute
+                    # instead of relative to the face.
+                    left = left + face[0:2]
+                    right = right + face[0:2]
+
                     # img=centereyesscalechin(original, face, eyes)
-                    img=iodtransform(img, face, left, right)
+                    img=iodtransform(img, left, right)
 
                     # Crop to the proper aspect ratio
                     img=crop(img)
 #                    cv2.resizeWindow(title, img.shape[0:2])
-
-
-#                if (left and right):
-#                    iod = sqrt( (right[0]-left[0])**2 + (right[1]-left[1])**2 ) / img.shape[0]
-#                    print( "Inter-Ocular distance as fraction of image: ", iod )
-#                    print( "Goal for US passport is: ", 2.0/12.0 )
-#                    if (iod): print( "Slope: ", (right[1]-left[1])/(right[0]-left[0]) )
 
 
         # Show the image (and frames per second)
@@ -558,12 +561,14 @@ def main():
             break
 
         elif (c == ' ' or c=='p' or c=='s'):    # Save a screenshot
-            if (oldfaces is not None and oldeyes is not None):
+            if (oldface is not None and oldeyes is not None and oldleft is not None and oldright is not None):
                 imgscale=float(original.shape[0])/img.shape[0]
-                f = np.dot( face, imgscale )
-                e = np.dot( eyes, imgscale )
+                f = np.dot( oldface, imgscale )
+                e = np.dot( oldeyes, imgscale )
+                l = np.dot( left, imgscale )
+                r = np.dot( right, imgscale )
                 # img=centereyesscalechin(original, f, e)
-                img=iodtransform(original, face, left, right)
+                img = iodtransform( original, l, r )
                 img=crop(img)
                 cv2.imwrite("passport.jpg", img)
                 print("Wrote image to passport.jpg")
