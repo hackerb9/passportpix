@@ -30,6 +30,9 @@ camera_device=0
 # Is camera on its side? 0 == nope, 1 == 90, 2 == 180, 3 == 270.
 camera_rotation=0
 
+# Show the image like in a mirror (flipped horizontal)
+camera_mirrored=1
+
 # Max resolution (in pixels) to downscale the image to before processing. 
 # This is used both to speed up the Haar cascade and for display on the screen.
 # It does not affect the final output image resolution. 
@@ -41,6 +44,7 @@ frame_downscale=None
 
 import cv2 as cv2
 import numpy as np
+from math import sqrt
 
 # My files
 from fps import FPS
@@ -101,10 +105,12 @@ def init():
                            path + '/haarcascade_frontalface_default.xml' )
         eyepair_cascade  = cv2.CascadeClassifier(
                            path + '/haarcascade_mcs_eyepair_big.xml' )
+        # NB: The OpenCV haar cascades use "LEFT" to mean "Left relative
+        # to the person in the image", while we mean left-side of image .
         lefteye_cascade  = cv2.CascadeClassifier(
-                           path + '/haarcascade_lefteye_2splits.xml' )
-        righteye_cascade  = cv2.CascadeClassifier(
                            path + '/haarcascade_righteye_2splits.xml' )
+        righteye_cascade  = cv2.CascadeClassifier(
+                           path + '/haarcascade_lefteye_2splits.xml' )
 
         if not (face_cascade.empty() or eyepair_cascade.empty() or
                 lefteye_cascade.empty() or righteye_cascade.empty()):
@@ -245,10 +251,9 @@ def findtheeyes(img, eye_pair):
 
     roi_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    lefteye = lefteye_cascade.detectMultiScale(roi_gray)
-
+    lefteyes = lefteye_cascade.detectMultiScale(roi_gray)
     left = None
-    for (lx,ly,lw,lh) in lefteye:
+    for (lx,ly,lw,lh) in lefteyes:
         # Check each eye found and see if it is on the left side
         # of the eye pair rectangle. 
         left = (lx+lw/2, ly+lh/2) 	# Center of eye
@@ -262,9 +267,9 @@ def findtheeyes(img, eye_pair):
             cv2.rectangle(img,(lx,ly,lw,lh),magenta,2)
             break
 
-    righteye = righteye_cascade.detectMultiScale(roi_gray)
+    righteyes = righteye_cascade.detectMultiScale(roi_gray)
     right = None
-    for (lx,ly,lw,lh) in righteye:
+    for (lx,ly,lw,lh) in righteyes:
         # Check each eye found and see if it is on the right side
         # of the eye pair rectangle. 
         right = (lx+lw/2, ly+lh/2) 	# Center point of eye
@@ -292,12 +297,13 @@ def roi(img, rect):
     (x,y,w,h) = rect
     return img[y:y+h, x:x+w]
 
-def centerandscale(img, x_y_w_h, ex_ey_ew_eh):
+def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     x,y,w,h = x_y_w_h
     ex,ey,ew,eh = ex_ey_ew_eh
 
     # Given the image and bounding boxes for the face and eyes,
-    # recenter the image and scale it so the eyes are in the right place.
+    # recenter the image and scale it so the eyes are in the middle and
+    # the chin is the proper proportion from the bottom.
 
     height, width, channels = img.shape
 
@@ -329,6 +335,73 @@ def centerandscale(img, x_y_w_h, ex_ey_ew_eh):
     ty = height/2-(y+ey+(y+ey+eh))/2
     M = np.float32([[1,0,tx],[0,1,ty]])
     img = cv2.warpAffine(img,M,(width,height))
+    return img
+
+def iodtransform(img, face, left_right, right=None):
+    # Given center of left and right eyes, return a 3x2 matrix which
+    # represents the affine transform needed to map an image so that
+    # the eyes are are horizontal, at the correct eye_height, and the
+    # proper distance apart.
+    left = left_right
+    if right == None:
+        (left, right) = left_right
+    
+    (Lu, Lv) = left + face[0:2]
+    (Ru, Rv) = right + face[0:2]
+    (h, w, channels) = img.shape
+
+    Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 )
+    IOD = eye_distance
+
+    #print(f"Left: {Lu}, {Lv}")
+    #print(f"\t\tRight: {Ru}, {Rv}")
+
+    F = np.float32( [ [ 1, 0, -Lu ],
+                      [ 0, 1, -Lv ],
+                      [ 0, 0,  1  ] ] )
+
+    G = np.float32( [ [ (Ru-Lu)/Hyp, -(Rv-Lv)/Hyp, 0 ],
+                      [ (Rv-Lv)/Hyp,  (Ru-Lu)/Hyp, 0 ],
+                      [ 0,       0,      1 ] ] )
+
+    H = np.float32( [ [ w*IOD/(Ru-Lu), 0,        0 ],
+                      [ 0,        w*IOD/(Ru-Lu), 0 ],
+                      [ 0,        0,        1 ] ] )
+
+    J = np.float32( [ [ 1, 0, w/2 - w*IOD/2 ],
+                      [ 0, 1, eye_height*h  ],
+                      [ 0, 0, 1             ] ] )
+
+    Fp = np.float32( [ [ 1, 0, Lu ],
+                       [ 0, 1, Lv ],
+                       [ 0, 0,  1 ] ] )
+
+    Gp = np.float32( [ [  (Ru-Lu)/Hyp, (Rv-Lv)/Hyp, 0 ],
+                       [ -(Rv-Lv)/Hyp, (Ru-Lu)/Hyp, 0 ],
+                       [ 0,       0,      1 ] ] )
+
+    Hp = np.float32( [ [ Hyp/(w*IOD),      0,          0 ],
+                       [ 0,           Hyp/(w*IOD),     0 ],
+                       [ 0,               0,           1 ] ] )
+
+    Jp = np.float32( [ [ 1, 0,  w*IOD/2 - w/2 ],
+                       [ 0, 1, -eye_height*h  ],
+                       [ 0, 0,  1             ] ] )
+
+    scale = w*IOD/(Ru-Lu)
+
+    # print( "F\n", F )
+    # print( "G\n", G )
+    # print( "H\n", H )
+    # print( "J\n", J )
+              
+    M = np.float32( [ [  (Ru-Lu)/Hyp*scale, (Rv-Lv)/Hyp, w/2 - w*IOD/2 -Lu*scale ],
+                      [ -(Rv-Lv)/Hyp, (Ru-Lu)/Hyp*scale, h - eye_height*h - Lv*scale ] ] )
+
+    # print( "M\n", M )
+
+
+    img = cv2.warpAffine(img, M, (w,h))
     return img
 
 def crop(img):
@@ -395,14 +468,14 @@ def isWithinLeft(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
         (rx,ry,rw,rh) = rect_x_y_w_h
     else:
         rx = rect_x_y_w_h
-    return isWithin( point, rx+rw/2, ry, rw/2, rh )
+    return isWithin( point, rx, ry, rw/2, rh )
 
 def isWithinRight(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
     if not ry:
         (rx,ry,rw,rh) = rect_x_y_w_h
     else:
         rx = rect_x_y_w_h
-    return isWithin( point, rx, ry, rw/2, rh )
+    return isWithin( point, rx+rw/2, ry, rw/2, rh )
 
 
 def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness=None):
@@ -418,7 +491,7 @@ def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness
 
     
 def main():    
-    global downscale, frame_downscale
+    global downscale, frame_downscale, camera_mirrored
 
     face = None
     eyes = None
@@ -451,28 +524,25 @@ def main():
                 # Find the left and right eyes using the Haar cascade
                 (left, right) = findtheeyes(roi_color, eyes)
 
-                if (left and right):
-                    iod = (right[0]-left[0]) / img.shape[0]
-                    print( "Inter-Ocular distance as fraction of image: ", iod )
-                    print( "Goal for US passport is: ", 2.0/12.0 )
-                    if (iod): print( "Slope: ", (right[1]-left[1])/(right[0]-left[0]) )
+                if (left is not None and right is not None):
+                    # img=centereyesscalechin(original, face, eyes)
+                    img=iodtransform(img, face, left, right)
+
+                    # Crop to the proper aspect ratio
+                    img=crop(img)
+#                    cv2.resizeWindow(title, img.shape[0:2])
 
 
-        # If both are found, center on the eyes and scale
-        if (face is not None and eyes is not None):
+#                if (left and right):
+#                    iod = sqrt( (right[0]-left[0])**2 + (right[1]-left[1])**2 ) / img.shape[0]
+#                    print( "Inter-Ocular distance as fraction of image: ", iod )
+#                    print( "Goal for US passport is: ", 2.0/12.0 )
+#                    if (iod): print( "Slope: ", (right[1]-left[1])/(right[0]-left[0]) )
 
-            # Find the left and right eyes using the Haar cascade
-            roi_color = roi(img, face)
-            (left, right) = findtheeyes(roi_color, eyes)
-
-            img=centerandscale(img, face, eyes)
-
-            # Crop to the proper aspect ratio
-            img=crop(img)
-            cv2.resizeWindow(title, img.shape[0:2])
 
         # Show the image (and frames per second)
-        cv2.imshow(title, cv2.flip(img,1))
+        cv2.imshow(title, cv2.flip(img,1) if camera_mirrored else img)
+
         if (fps.framecount % 10 == 0):
             eprint('%.2f fps' % fps.getFPS(), end='\r')
             fps.reset()
@@ -492,7 +562,8 @@ def main():
                 imgscale=float(original.shape[0])/img.shape[0]
                 f = np.dot( face, imgscale )
                 e = np.dot( eyes, imgscale )
-                img=centerandscale(original, f, e)
+                # img=centereyesscalechin(original, f, e)
+                img=iodtransform(original, face, left, right)
                 img=crop(img)
                 cv2.imwrite("passport.jpg", img)
                 print("Wrote image to passport.jpg")
@@ -514,6 +585,9 @@ def main():
         elif (c == 'f'):          		# Toggle full screen
             isFull = cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN)
             cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 1 - isFull)
+
+        elif (c == 'm'):          		# Toggle mirroring
+            camera_mirrored = 1 - camera_mirrored
 
         elif (c == '*'):        # debugging
             print("rectangle", cv2.getWindowImageRect(title))
