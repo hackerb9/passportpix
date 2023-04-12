@@ -4,7 +4,7 @@ global photo_width, photo_height, photo_aspect
 global eye_distance, eye_height
 global chin_height
 global camera_device, camera_rotation
-global downscale, frame_downscale
+global downscale
 
 # Photo metadata (Note: not saved in .jpg file, yet)
 photo_width=2.0
@@ -90,7 +90,7 @@ def maxpect(photo_aspect, old_width, old_height):
         new_width=new_width*old_height/new_height
         new_height=old_height
         
-    return (new_width, new_height)
+    return (int(new_width), int(new_height))
 
 def init():
     # Initialize camera, UI window, Haar cascades, etc.
@@ -99,6 +99,9 @@ def init():
     global face_cascade, eyepair_cascade, lefteye_cascade, righteye_cascade
     global capture, frame_width, frame_height
     global fps, downscale, frame_downscale
+    global face_warp
+
+    face_warp = None     # Transform matrix to remap face in image
 
     # Load up the sample Haar cascades from opencv-data (or current directory)
     for path in ('.', 'haarcascades', '/usr/local/share/opencv/haarcascades/',
@@ -305,6 +308,7 @@ def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     ex,ey,ew,eh = ex_ey_ew_eh
 
     # Given the image and bounding boxes for the face and eyes,
+    # return a transform matrix that will 
     # recenter the image and scale it so the eyes are in the middle and
     # the chin is the proper proportion from the bottom.
 
@@ -337,8 +341,8 @@ def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     tx = width/2-(x+ex+(x+ex+ew))/2
     ty = height/2-(y+ey+(y+ey+eh))/2
     M = np.float32([[1,0,tx],[0,1,ty]])
-    img = cv2.warpAffine(img,M,(width,height))
-    return img
+    return M
+#    img = cv2.warpAffine(img,M,(width,height))
 
 def iodtransform(img, left_right, right=None):
     # Intraocular distance transform.
@@ -407,7 +411,8 @@ def iodtransform(img, left_right, right=None):
                       [ -(Rv-Lv)/Hyp, (Ru-Lu)/Hyp*scale, h - eye_height*h - Lv*scale ] ] )
 
     # print( "M\n", M )
-    return cv2.warpAffine( img, M, (w,h) )
+    return M
+#    return cv2.warpAffine( img, M, (w,h) )
 
 def crop(img):
     # Given an image, and the global variable photo_aspect,
@@ -496,7 +501,7 @@ def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness
 
     
 def main():    
-    global downscale, frame_downscale, camera_mirrored
+    global downscale, frame_downscale, camera_mirrored, face_warp
 
     face = None
     eyes = None
@@ -535,11 +540,18 @@ def main():
                     left = left + face[0:2]
                     right = right + face[0:2]
 
-                    # img=centereyesscalechin(original, face, eyes)
-                    img=iodtransform(img, left, right)
+                    if eye_distance is not None:
+                        face_warp = iodtransform(img, left, right)
+                    else:
+                        # Fallback to using the chin distance for scaling.
+                        face_warp = centereyesscalechin(original, face, eyes)
+
+                    img = cv2.warpAffine( img, face_warp, (img.shape[1], img.shape[0]) )
 
                     # Crop to the proper aspect ratio
                     img=crop(img)
+
+                    # OpenCV's resizeWindow is buggy, especially with fullscreen.
 #                    cv2.resizeWindow(title, img.shape[0:2])
 
 
@@ -561,15 +573,13 @@ def main():
             break
 
         elif (c == ' ' or c=='p' or c=='s'):    # Save a screenshot
-            if (oldface is not None and oldeyes is not None and oldleft is not None and oldright is not None):
-                imgscale=float(original.shape[0])/img.shape[0]
-                f = np.dot( oldface, imgscale )
-                e = np.dot( oldeyes, imgscale )
-                l = np.dot( left, imgscale )
-                r = np.dot( right, imgscale )
-                # img=centereyesscalechin(original, f, e)
-                img = iodtransform( original, l, r )
-                img=crop(img)
+            if (face_warp is not None):
+                scale = original.shape[0] / img.shape[0]
+                M = face_warp
+                M[0][2] *= scale # Scale up the translation part of the transform.
+                M[1][2] *= scale
+                img = cv2.warpAffine( original, M, original.shape[1::-1] )
+                img = crop(img)
                 cv2.imwrite("passport.jpg", img)
                 print("Wrote image to passport.jpg")
             else:
