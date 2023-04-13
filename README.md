@@ -45,10 +45,11 @@ The default setup is correct for US Passport photos:
 These variables are listed at the top of passport.py and can be
 changed there.
 
+<details><summary>Click to see an example customization</summary>
+
 ### Example customization
 
-If one wanted to get a visa to visit China, the requirements as of
-2020 are:
+If one need a visa to visit China, the photo requirements as of 2020 are:
 
 | Variable     | Description                                                              | Setting for CN Visa             |
 |--------------|--------------------------------------------------------------------------|---------------------------------|
@@ -69,13 +70,23 @@ photo_units  = "mm"
 photo_aspect = photo_width/photo_height
 eye_height   = 24.0 / 48.0
 chin_height  = 7.0 / 48.0
+use_chin_height = True
 ```
+
+Note that by default `use_chin_height` is False, which causes
+`eye_distance` to be used for calculating the scaling instead of
+`chin_height`. You can also hit the <kbd>Tab</kbd> key to switch
+between those two methods.
+
+</details>
 
 ## Current keys
 
-* <kbd>Space</kbd>: Save snapshot to passport.jpg  
-* <kbd>f</kbd>: Toggle fullscreen  
-* <kbd>m</kbd>: Toggle mirroring  
+* <kbd>Space</kbd>: Save snapshot to passport.jpg
+* <kbd>f</kbd>: Toggle fullscreen
+* <kbd>m</kbd>: Toggle mirroring
+* <kbd>r</kbd>: Increment camera rotation by 90°
+* <kbd>Tab</kbd>: Toggle between US and Chinese photo requirements.
 * <kbd>q</kbd> or <kbd>Esc</kbd>: Quit
 
 ### Experimental keys for resolution
