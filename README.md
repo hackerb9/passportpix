@@ -93,6 +93,7 @@ between those two methods.
 
 ### Experimental keys for resolution
 <details><summary><b>Click to see more keys</b></summary>
+
 <blockquote>
 
 These keys change the downscale resolution which is used for both the
@@ -111,6 +112,7 @@ affect the output resolution in the saved file.
 Note that OpenCV's builtin face detection algorithms failed for me on
 160×160 images.
 </blockquote>
+</details>
 
 ## Current Assumptions
 
