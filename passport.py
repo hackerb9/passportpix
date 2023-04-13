@@ -497,8 +497,9 @@ def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness
 
     
 def main():    
-    global downscale, frame_downscale, camera_mirrored, face_warp
-    global use_chin_scaling
+    global downscale, frame_downscale, frame_height, frame_width
+    global camera_mirrored, camera_rotation
+    global face_warp, use_chin_scaling 
 
     face = None
     eyes = None
@@ -598,11 +599,16 @@ def main():
             isFull = cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN)
             cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 1 - isFull)
 
-        elif (c == '\t'):          		# Switch US/CN photo standard
-            use_chin_scaling = 1 - use_chin_scaling
+        elif (c == 'r'):          		# Rotate camera
+            camera_rotation = (camera_rotation + 1) % 4
+            frame_width, frame_height = frame_height, frame_width
+
 
         elif (c == 'm'):          		# Toggle mirroring
             camera_mirrored = 1 - camera_mirrored
+
+        elif (c == '\t'):          		# Switch US/CN photo standard
+            use_chin_scaling = 1 - use_chin_scaling
 
         elif (c == '*'):        # debugging
             print("rectangle", cv2.getWindowImageRect(title))
