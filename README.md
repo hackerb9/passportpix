@@ -1,5 +1,7 @@
 # passportpix
 
+<img src="./US-examples/good/img_good_12.jpg" align="right" width="25%">
+
 Take a passport photo of precisely the proper dimensions using
 computer vision to pan and zoom on the face.
 
