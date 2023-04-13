@@ -2,7 +2,7 @@
 # CONFIGURABLE CONSTANTS - .-. -.--
 global photo_width, photo_height, photo_aspect
 global eye_distance, eye_height
-global chin_height
+global chin_height, use_chin_scaling
 global camera_device, camera_rotation
 global downscale
 
@@ -26,6 +26,7 @@ eye_height = 7.0 / 12.0
 
 # Distance from chin to bottom of picture divided by picture length (CN Visa)
 chin_height=7.0/48.0
+use_chin_scaling=False           # False (default) means to use eye_distance
 
 # Which camera to open (first is 0)
 camera_device=0
@@ -325,24 +326,19 @@ def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     # (1/2- chin_height) times the image height. (E.g., 5/14th).
 
     scale = (0.5-chin_height) * height/chintoeyes
-    img = cv2.resize(img, None, fx=scale, fy=scale)
 
-    # This is silly. How do I numptify this?
-    x=scale*x
-    y=scale*y
-    w=scale*w
-    h=scale*h
-    ex=scale*ex
-    ey=scale*ey
-    ew=scale*ew
-    eh=scale*eh
+    # Scale all measurements
+    (x, y, w, h, ex, ey, ew, eh) = np.dot (
+            (x, y, w, h, ex, ey, ew, eh), scale )
 
     # Translation needed in the X and Y directions to put eyes in center
     tx = width/2-(x+ex+(x+ex+ew))/2
     ty = height/2-(y+ey+(y+ey+eh))/2
-    M = np.float32([[1,0,tx],[0,1,ty]])
+
+    # The transformation matrix is the scaling + translation.
+    M = np.float32([[scale,0,tx],[0,scale,ty]])
     return M
-#    img = cv2.warpAffine(img,M,(width,height))
+
 
 def iodtransform(img, left_right, right=None):
     # Intraocular distance transform.
@@ -502,6 +498,7 @@ def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness
     
 def main():    
     global downscale, frame_downscale, camera_mirrored, face_warp
+    global use_chin_scaling
 
     face = None
     eyes = None
@@ -540,11 +537,11 @@ def main():
                     left = left + face[0:2]
                     right = right + face[0:2]
 
-                    if eye_distance is not None:
+                    if not use_chin_scaling:
                         face_warp = iodtransform(img, left, right)
                     else:
                         # Fallback to using the chin distance for scaling.
-                        face_warp = centereyesscalechin(original, face, eyes)
+                        face_warp = centereyesscalechin(img, face, eyes)
 
                     img = cv2.warpAffine( img, face_warp, (img.shape[1], img.shape[0]) )
 
@@ -600,6 +597,9 @@ def main():
         elif (c == 'f'):          		# Toggle full screen
             isFull = cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN)
             cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, 1 - isFull)
+
+        elif (c == '\t'):          		# Switch US/CN photo standard
+            use_chin_scaling = 1 - use_chin_scaling
 
         elif (c == 'm'):          		# Toggle mirroring
             camera_mirrored = 1 - camera_mirrored
