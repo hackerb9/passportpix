@@ -602,7 +602,7 @@ def main():
         elif (c == 'r'):          		# Rotate camera
             camera_rotation = (camera_rotation + 1) % 4
             frame_width, frame_height = frame_height, frame_width
-
+            recalculate_frame_downscale(downscale)
 
         elif (c == 'm'):          		# Toggle mirroring
             camera_mirrored = 1 - camera_mirrored
