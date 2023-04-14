@@ -13,26 +13,36 @@ to "passport.jpg" and <kbd>q</kbd> to quit.
 
 ## How to run
 
-## NOTE
+``` bash
+apt install python-opencv opencv-data
+git clone https://github.com/hackerb9/passportpix
+cd passportpix
+./passport.py
+```
 
-Preview on screen is lower resolution than saved to a file. The
-face detection routine is a bit CPU hungry so the image is downscaled
-to fit in a 640x640 square before processing to get a better frame
-rate. Likewise, some low-end computers, such as the Raspberry Pi,
-struggle with displaying large images rapidly, so the downscaled image
-is used for screen display.
+## Notes
 
-# TIP
+### Resolution
+
+The image saved to a file is higher resolution than the preview shown
+on screen. The face detection routine is a bit CPU hungry so the image
+is downscaled to fit in a 640x640 square before processing to get a
+better frame rate. Likewise, some low-end computers, such as the
+Raspberry Pi, struggle with displaying large images rapidly, so the
+downscaled image is used for screen display.
+
+### TIP
 
 If you leave an image viewer, such as `eog passport.jpg`, running
 in the background, you'll see the picture update immediately so you
 can tell if you like it or not.
 
-# TIP
+### TIP
 
 If you need a "portrait" photo (taller than it is wide), you can
 improve the image resolution by rotating your camera sideways and edit
-the `camera_rotation` variable at the top of the file. 
+the `camera_rotation` variable at the top of the file. (Or hit the 'r'
+key). 
 
 ## Customization
 
@@ -85,11 +95,14 @@ between those two methods.
 ## Current keys
 
 * <kbd>Space</kbd>: Save snapshot to passport.jpg
+* <kbd>q</kbd> or <kbd>Esc</kbd>: Quit
 * <kbd>f</kbd>: Toggle fullscreen
+
+Less useful keys:
 * <kbd>m</kbd>: Toggle mirroring
 * <kbd>r</kbd>: Increment camera rotation by 90°
-* <kbd>Tab</kbd>: Toggle between US and Chinese photo requirements.
-* <kbd>q</kbd> or <kbd>Esc</kbd>: Quit
+* <kbd>Tab</kbd>: Toggle between US (eye distance) and Chinese (chin distance) photo requirements.
+* <kbd>Enter</kbd>: Show debugging info
 
 ### Experimental keys for resolution
 <details><summary><b>Click to see more keys</b></summary>
