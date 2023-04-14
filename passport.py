@@ -3,7 +3,7 @@
 global photo_width, photo_height, photo_aspect
 global eye_distance, eye_height
 global chin_height, use_chin_scaling
-global camera_device, camera_rotation
+global camera_device, camera_rotation, camera_codec, camera_fps
 global downscale
 
 # Photo metadata (Note: not saved in .jpg file, yet)
@@ -44,11 +44,23 @@ camera_mirrored=1
 downscale=640
 frame_downscale=None
 
+# Frames per second to request the camera to retrieve. None means maximum.
+# While unlikely, it is possible you'd want to set this lower on a bandwidth
+# limited camera as there's a small chance it'd improve compression quality.
+camera_fps=None
+
+# Optionally use a different codec for getting data from the camera.
+# For example, codec='MJPG' might improve FPS and resolution over USB2,
+# but the poor quality from compression makes it a questionable tradeoff.
+camera_codec=None
+camera_codec='foo'
+
 ######################################################################
 
 import cv2 as cv2
 import numpy as np
 from math import sqrt
+import sys
 
 # My files
 from fps import FPS
@@ -138,14 +150,28 @@ def init():
         if capture and capture.isOpened(): break
 
     if (not capture.isOpened()):
-        print("Oops. Video device %d didn't open properly. Dying."
-              % (camera_device))
+        print(f"Error. Could not open video device {camera_device}.")
         exit(1)
 
     print("Successfully opened video device %d using %s."
           % (camera_device, capture.getBackendName()))
         
-    # Instead of returning an error code, thrown an exception on errors. 
+    if camera_codec:
+        if set_fourcc(capture, camera_codec):
+            print( f"Successfully changed camera codec to '{camera_codec}'." )
+        else:
+            print(f"Warning: Couldn't change camera codec to '{camera_codec}'.")
+    print( "Camera codec is ", get_fourcc(capture) )
+
+    if camera_fps:
+        capture.set(cv2.CAP_PROP_FPS, camera_fps)
+        if camera_fps == capture.get(cv2.CAP_PROP_FPS):
+            print(f"Camera FPS successfully set to {camera_fps}.")
+        else:
+            print(f"Warning: Could not change camera FPS to {camera_fps}.")
+    print( "Camera is capturing at", capture.get(cv2.CAP_PROP_FPS), "fps." )
+
+    # Instead of returning an error code, throw an exception on errors. 
     capture.setExceptionMode(True)
 
     # Set camera to max resolution.
@@ -153,8 +179,6 @@ def init():
     # 	NOTA BENE: this works with some backends, such as V4L2,
     #   but makes others, such as GSTREAMER, go haywire. 
     #
-    # This does not yet handle switching the camera to a different
-    # FOURCC format when necessary for higher resolution.
     try:
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, 10000)
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT,10000)
@@ -496,6 +520,40 @@ def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness
     cv2.line(img,(x+w,y),(x,y+h),color,thickness)
 
     
+def get_fourcc(cap: cv2.VideoCapture) -> str:
+    """Return the 4-letter string of the codec the camera is using.
+
+    'cap' is an OpenCV camera opened using VideoCapture().
+
+    If the VideoCapture device is not opened or if the backend is not
+    capable, a string of four nulls will be returned. ('\\x00\\x00\\x00\\x00')
+
+    NB: as of 2023, the GSTREAMER backend always fails. Use V4L2 instead.
+    """
+    return int(cap.get(cv2.CAP_PROP_FOURCC))\
+             .to_bytes(4, byteorder=sys.byteorder).decode()
+
+def set_fourcc(cap: cv2.VideoCapture, codec: str) -> bool:
+    """Set the the codec the camera is using for capture.
+
+    'cap' is an OpenCV camera opened using VideoCapture().
+
+    'codec' is a fourcc string such as 'YUYV' or 'MJPG'.
+
+    Return value is True iff the camera codec was successfully changed.
+
+    NOTA BENE: As of 2023, the GSTREAMER backend always fails.
+    Open your camera using cv2.VideoCapture(0, cv2.CAP_V4L2) instead.
+
+    Note: As of 2023, OpenCV has no way to enumerate available codecs.
+    Under GNU/Linux, you can run 'v4l2-ctl --list-formats-ext' from the
+    command line.
+    """
+    cap.set(cv2.CAP_PROP_FOURCC,
+            int.from_bytes(codec.encode(), byteorder=sys.byteorder))
+    return codec == get_fourcc(cap)
+
+
 def main():    
     global downscale, frame_downscale, frame_height, frame_width
     global camera_mirrored, camera_rotation
