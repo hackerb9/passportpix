@@ -558,8 +558,11 @@ def main():
     global camera_mirrored, camera_rotation
     global face_warp, use_chin_scaling 
 
-    face = None
-    eyes = None
+    # OpenCV coordinates of detected features 
+    face = None                 # Rectangle around the face (x,y,w,h)
+    eyes = None                 # Rectangle around the pair of eye (x,y,w,h)
+    left = None                 # Point at center of left eye (x,y)
+    right = None                # Point at center of right eye (x,y)
 
     init()
 
@@ -667,7 +670,12 @@ def main():
         elif (c == '\t'):          		# Switch US/CN photo standard
             use_chin_scaling = 1 - use_chin_scaling
 
-        elif (c == '*'):        # debugging
+        elif (c == '*' or c == '\r'):        # debugging
+            print(f"face is {face}")
+            print(f"eye pair is {eyes}")
+            print(f"left eye is {left}")
+            print(f"right eye is {right}")
+            print("GUI props")
             print("rectangle", cv2.getWindowImageRect(title))
             print("fullscreen: ",cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN))
             print("autosize: ",cv2.getWindowProperty(title, cv2.WND_PROP_AUTOSIZE))
