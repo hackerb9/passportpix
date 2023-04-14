@@ -168,7 +168,6 @@ def init():
             print(f"Camera FPS successfully set to {camera_fps}.")
         else:
             print(f"Warning: Could not change camera FPS to {camera_fps}.")
-    print( "Camera is capturing at", capture.get(cv2.CAP_PROP_FPS), "fps." )
 
     # Instead of returning an error code, throw an exception on errors. 
     capture.setExceptionMode(True)
@@ -196,7 +195,8 @@ def init():
     if (camera_rotation==1 or camera_rotation==3):
         frame_width, frame_height = frame_height, frame_width
 
-    print("Capturing at %d x %d" % (frame_width, frame_height) )
+    print("Capturing at %d x %d at %d FPS." %
+          (frame_width, frame_height, capture.get(cv2.CAP_PROP_FPS) ))
 
     print("Output image size will be %d x %d" %
           maxpect(photo_aspect, frame_width, frame_height))
@@ -552,6 +552,25 @@ def set_fourcc(cap: cv2.VideoCapture, codec: str) -> bool:
             int.from_bytes(codec.encode(), byteorder=sys.byteorder))
     return codec == get_fourcc(cap)
 
+def print_debug_info(face, eyes, left, right):
+    print()
+    print(f"face is {face}\t left eye is {left}")
+    print(f"eye pair is {eyes}\tright eye is {right}")
+    print("GUI props")
+    print("\trectangle", cv2.getWindowImageRect(title))
+    print("\tfullscreen: ",cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN))
+    print("\tautosize: ",cv2.getWindowProperty(title, cv2.WND_PROP_AUTOSIZE))
+    print("\taspect ratio: ",cv2.getWindowProperty(title, cv2.WND_PROP_ASPECT_RATIO))
+    print("\topengl: ",cv2.getWindowProperty(title, cv2.WND_PROP_OPENGL))
+    print("\tvisible: ",cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE))
+    print("\ttopmost: ",cv2.getWindowProperty(title, cv2.WND_PROP_TOPMOST))
+    print("Camera is capturing at %d x %d at %d FPS." %
+          (frame_width, frame_height, capture.get(cv2.CAP_PROP_FPS) ))
+
+    print("Output image size will be %d x %d" %
+          maxpect(photo_aspect, frame_width, frame_height))
+
+
 
 def main():    
     global downscale, frame_downscale, frame_height, frame_width
@@ -604,12 +623,12 @@ def main():
                         # Fallback to using the chin distance for scaling.
                         face_warp = centereyesscalechin(img, face, eyes)
 
-                    img = cv2.warpAffine( img, face_warp, (img.shape[1], img.shape[0]) )
+                    img = cv2.warpAffine( img, face_warp, img.shape[1::-1] ) 
 
                     # Crop to the proper aspect ratio
                     img=crop(img)
 
-                    # OpenCV's resizeWindow is buggy, especially with fullscreen.
+                    # OpenCV's resizeWindow is buggy, especially with fullscreen
 #                    cv2.resizeWindow(title, img.shape[0:2])
 
 
@@ -669,21 +688,25 @@ def main():
 
         elif (c == '\t'):          		# Switch US/CN photo standard
             use_chin_scaling = 1 - use_chin_scaling
+            print( "US Passport" if use_chin_scaling == 0 else "Chinese Visa",
+                   "scaling algorithm now in use." )
 
-        elif (c == '*' or c == '\r'):        # debugging
-            print(f"face is {face}")
-            print(f"eye pair is {eyes}")
-            print(f"left eye is {left}")
-            print(f"right eye is {right}")
-            print("GUI props")
-            print("rectangle", cv2.getWindowImageRect(title))
-            print("fullscreen: ",cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN))
-            print("autosize: ",cv2.getWindowProperty(title, cv2.WND_PROP_AUTOSIZE))
-            print("aspect ratio: ",cv2.getWindowProperty(title, cv2.WND_PROP_ASPECT_RATIO))
-            print("opengl: ",cv2.getWindowProperty(title, cv2.WND_PROP_OPENGL))
-            print("visible: ",cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE))
-            print("topmost: ",cv2.getWindowProperty(title, cv2.WND_PROP_TOPMOST))
+        elif (c == '\r' or c == '*'):        # debugging
+            print_debug_info(face, eyes, left, right)
 
+        elif (c == '?' or c == 'h'):          		# show help
+            print("""
+Keys available:
+    q  (or Esc)		Quit
+    Spacebar		Save image to passport.jpg
+    f			Toggle fullscreen
+    r			Change camera rotation by 90 degrees
+    m			Toggle mirroring of image
+    1-5			Change internal downscaling (for slow computers)
+    0			Disable downscaling completely
+    Tab			Switch scaling method (eye distance or chin)
+    Enter		Show debugging information
+            	""")
 
         else:
             eprint('Unknown key %c (%x)' % (c, k))
