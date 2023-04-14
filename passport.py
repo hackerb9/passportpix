@@ -385,9 +385,30 @@ def iodtransform(img, l_r, r=None):
 
     Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 )
     IOD = eye_distance
+    scale = w*IOD/(Ru-Lu)
+    M = np.float32(
+        [ [  (Ru-Lu)/Hyp*scale,  (Rv-Lv)/Hyp,  w/2 - w*IOD/2 - Lu*scale ],
+          [ -(Rv-Lv)/Hyp,  (Ru-Lu)/Hyp*scale,  h - eye_height*h - Lv*scale ] ] )
 
-    #print(f"Left: {Lu}, {Lv}")
-    #print(f"\t\tRight: {Ru}, {Rv}")
+    return M
+
+
+def buggyiodtransform(img, l_r, r=None):
+    # Intraocular distance transform, same as above, but buggy 
+
+    if r is not None:
+        l = l_r
+    else:
+        (l, r) = l_r
+    
+    (Lu, Lv) = l
+    (Ru, Rv) = r
+    (h, w, channels) = img.shape
+
+    Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 )
+    IOD = eye_distance
+
+    print(f"Left: {Lu}, {Lv}\t\tRight: {Ru}, {Rv}")
 
     F = np.float32( [ [ 1, 0, -Lu ],
                       [ 0, 1, -Lv ],
@@ -421,19 +442,13 @@ def iodtransform(img, l_r, r=None):
                        [ 0, 1, -eye_height*h  ],
                        [ 0, 0,  1             ] ] )
 
-    scale = w*IOD/(Ru-Lu)
-
-    # print( "F\n", F )
-    # print( "G\n", G )
-    # print( "H\n", H )
-    # print( "J\n", J )
+    print( "F\n", F )
+    print( "G\n", G )
+    print( "H\n", H )
+    print( "J\n", J )
               
-    M = np.float32( [ [  (Ru-Lu)/Hyp*scale, (Rv-Lv)/Hyp, w/2 - w*IOD/2 -Lu*scale ],
-                      [ -(Rv-Lv)/Hyp, (Ru-Lu)/Hyp*scale, h - eye_height*h - Lv*scale ] ] )
-
-    # print( "M\n", M )
-    return M
-#    return cv2.warpAffine( img, M, (w,h) )
+    N=J*H*G*F
+    return N[:][0:2]
 
 def crop(img):
     # Given an image, and the global variable photo_aspect,
