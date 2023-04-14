@@ -363,7 +363,7 @@ def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     return M
 
 
-def iodtransform(img, left_right, right=None):
+def iodtransform(img, l_r, r=None):
     # Intraocular distance transform.
     #
     # Given an image and the center of left and right eyes,
@@ -371,14 +371,16 @@ def iodtransform(img, left_right, right=None):
     # * horizontal,
     # * at the correct eye_height, and
     # * the proper distance apart (eye_distance).
+    #
+    # Note: eye_height/_distance are fractions of image height/width. 
 
-    if right is not None:
-        left = left_right
+    if r is not None:
+        l = l_r
     else:
-        (left, right) = left_right
+        (l, r) = l_r
     
-    (Lu, Lv) = left
-    (Ru, Rv) = right
+    (Lu, Lv) = l
+    (Ru, Rv) = r
     (h, w, channels) = img.shape
 
     Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 )
@@ -571,6 +573,20 @@ def print_debug_info(face, eyes, left, right):
           maxpect(photo_aspect, frame_width, frame_height))
 
 
+def print_help():
+    print("""
+Keys available:
+    q  (or Esc)		Quit
+    Spacebar		Save image to passport.jpg
+    f			Toggle fullscreen
+    r			Change camera rotation by 90 degrees
+    m			Toggle mirroring of image
+    1-5			Change internal downscaling (for slow computers)
+    0			Disable downscaling completely
+    Tab			Switch scaling method (eye distance or chin)
+    Enter		Show debugging information
+    """)
+
 
 def main():    
     global downscale, frame_downscale, frame_height, frame_width
@@ -695,19 +711,7 @@ def main():
             print_debug_info(face, eyes, left, right)
 
         elif (c == '?' or c == 'h'):          		# show help
-            print("""
-Keys available:
-    q  (or Esc)		Quit
-    Spacebar		Save image to passport.jpg
-    f			Toggle fullscreen
-    r			Change camera rotation by 90 degrees
-    m			Toggle mirroring of image
-    1-5			Change internal downscaling (for slow computers)
-    0			Disable downscaling completely
-    Tab			Switch scaling method (eye distance or chin)
-    Enter		Show debugging information
-            	""")
-
+            print_help()
         else:
             eprint('Unknown key %c (%x)' % (c, k))
 
