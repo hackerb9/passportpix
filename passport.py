@@ -18,11 +18,11 @@ photo_aspect=photo_width/photo_height
 # Distance between eyes as a fraction of the picture width (US Passport)
 eye_distance = 2.0 / 12.0
 
-# Distance from eyes to the bottom of the picture divided by picture length (US Passport)
-eye_height = 7.0 / 12.0
+# Distance from eyes to the bottom of the picture divided by picture length
+eye_height = 7.0 / 12.0					#  (US Passport)
 
-# Distance from eyes to the bottom of the picture divided by picture length (CN Visa)
-#eye_height = 24.0 / 48.0
+# Distance from eyes to the bottom of the picture divided by picture length
+#eye_height = 24.0 / 48.0				#  (CN Visa)
 
 # Distance from chin to bottom of picture divided by picture length (CN Visa)
 chin_height=7.0/48.0
@@ -53,7 +53,6 @@ camera_fps=None
 # For example, codec='MJPG' might improve FPS and resolution over USB2,
 # but the poor quality from compression makes it a questionable tradeoff.
 camera_codec=None
-camera_codec='foo'
 
 ######################################################################
 
@@ -150,7 +149,7 @@ def init():
         if capture and capture.isOpened(): break
 
     if (not capture.isOpened()):
-        print(f"Error. Could not open video device {camera_device}.")
+        eprint(f"Error. Could not open video device {camera_device}.")
         exit(1)
 
     print("Successfully opened video device %d using %s."
@@ -190,7 +189,7 @@ def init():
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     if (frame_width==0 or frame_height==0):
-        print("Error. Video device #%d returned resolution of %d x %d. Dying."
+        eprint("Error. Video device #%d returned resolution of %d x %d. Dying."
               % (camera_device, frame_width, frame_height))
         exit(1)
         
