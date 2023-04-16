@@ -290,7 +290,7 @@ def findtheeyes(img, eye_pair):
         left = (lx+lw/2, ly+lh/2) 	# Center of eye
         if not isWithinLeft( left, eye_pair ):
             # Reject 
-            exOut(img, (lx,ly,lw,lh) ,red,1)
+            exOut(img, (lx,ly,lw,lh), magenta, 1)
             left = None
             continue
         else:
@@ -306,7 +306,7 @@ def findtheeyes(img, eye_pair):
         right = (lx+lw/2, ly+lh/2) 	# Center point of eye
         if not isWithinRight( right, eye_pair ):
             # Reject
-            exOut(img, (lx,ly,lw,lh) ,red,1)
+            exOut(img, (lx,ly,lw,lh), yellow, 1)
             right = None
             continue
         else:
@@ -316,7 +316,10 @@ def findtheeyes(img, eye_pair):
 
     if (left and right):
         (oldleft, oldright) = (left, right)
-        #print ("Left", left, "\tRight", right, "\tEye pair", eye_pair)
+        if (abs(left[0]-right[0])<20):
+            print( "Left", left, "\tRight", right, "\tEye pair", eye_pair )
+            print( "Left  is within eye_pair:", isWithinLeft( left,  eye_pair) )
+            print( "Right is within eye_pair:", isWithinRight(right, eye_pair) )
 
     return (oldleft, oldright)
 
@@ -508,6 +511,7 @@ def getWindowSize ( title ):
     return (width, height)
 
 def isWithin(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
+    """Return true if a point is within a rectangle, inclusive"""
     px,py = point
     if not ry:
         (rx,ry,rw,rh) = rect_x_y_w_h
@@ -516,18 +520,20 @@ def isWithin(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
     return (rx <= px and px <= rx+rw and  ry <= py and py <= ry+rh)
 
 def isWithinLeft(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
+    """Return true if a point is within left quarter of a rectangle"""
     if not ry:
         (rx,ry,rw,rh) = rect_x_y_w_h
     else:
         rx = rect_x_y_w_h
-    return isWithin( point, rx, ry, rw/2, rh )
+    return isWithin( point, rx, ry, rw/4, rh )
 
 def isWithinRight(point, rect_x_y_w_h, ry=None, rw=None, rh=None):
+    """Return true if a point is within right quarter of a rectangle"""
     if not ry:
         (rx,ry,rw,rh) = rect_x_y_w_h
     else:
         rx = rect_x_y_w_h
-    return isWithin( point, rx+rw/2, ry, rw/2, rh )
+    return isWithin( point, rx+3*rw/4, ry, rw/4, rh )
 
 
 def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness=None):
