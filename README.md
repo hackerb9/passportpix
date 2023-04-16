@@ -101,8 +101,9 @@ between those two methods.
 Less useful keys:
 * <kbd>m</kbd>: Toggle mirroring
 * <kbd>r</kbd>: Increment camera rotation by 90°
-* <kbd>Tab</kbd>: Toggle between US (eye distance) and Chinese (chin distance) photo requirements.
-* <kbd>Enter</kbd>: Show debugging info
+* <kbd>Tab</kbd>: Toggle between US (eye distance) and Chinese (chin
+  distance) photo requirements. Does not change photo dimensions.
+* <kbd>Enter</kbd>: Show debugging info, save debugging images
 
 ### Experimental keys for resolution
 <details><summary><b>Click to see more keys</b></summary>
@@ -129,9 +130,6 @@ Note that OpenCV's builtin face detection algorithms failed for me on
 
 ## Current Assumptions
 
-* I'm assuming you will always want your eyes precisely centered in the
-picture.
-
 * I assume you always want the highest resolution possible from your camera.
 
 * You'll need to have 'python-opencv' installed. (`apt install python-opencv`) 
@@ -141,10 +139,6 @@ picture.
 * Cropped image jitters as eye locations are approximated. Ought to
   show uncropped camera view either in a second window or alone with a
   rectangle showing how the image will be cropped.
-
-* OpenCV appears to prefer YUYV (uncompressed) video, even if a camera
-  can provide a higher resolution & frame rate with MJPG (compressed).
-  This should only be a problem for older USB 2 cameras. 
 
 * OpenCV cannot write the proper DPI to the JPEG file, so it will not
   print out at the correct size without massaging. This is annoying, but
@@ -178,14 +172,26 @@ Mostly reminders to myself.
   v4l2-ctl --list-formats-ext
   ```
 
-* To print out the current GUI properties, hit <kbd>*</kbd>.
+* OpenCV appears to prefer uncompressed video, even if a camera can
+  provide a higher resolution & frame rate with compression turned on.
+
+  This may not be a problem. I've added functionality to allow for
+  compression and lower FPS, but even though the nominal resolution
+  was higher, the quality was noticeably worse than simply scaling the
+  uncompressed video. (At least on the cameras I tried). If you want
+  to give it a shot, change the variables `camera_codec='MJPG'` or
+  `camera_fps=15`.
+
+* To print out the current GUI properties and other debugging info,
+  hit <kbd>Enter</kbd>.
 
 * OpenCV has unnecessarily confusing GUI window properties. In
   particular, it appears OpenCV was originally written using simple
   integer Booleans (0 or 1), but someone later came along and decided
   that was too sloppy and renamed them all. However, instead of using
-  the typical True or False, they came up with new names for each
-  variable so each has its own nearly-unique way of being used.
+  the typical True or False, they came up with new names for truth
+  values for each variable so each has its own nearly-unique way of
+  being used.
 
   I found this silly and hard to read, so I do not follow that
   practice. For example, I have replaced the following code:
