@@ -701,7 +701,7 @@ def main():
         elif (c == 'q' or c == '\x1b'): 	# q or ESC to quit
             break
 
-        elif (c == ' ' or c=='p' or c=='s'):    # Save a screenshot
+        elif (c == ' ' or c=='p'):	    	# Save the passport pix
             if (face_warp is not None):
                 scale = original.shape[0] / img.shape[0]
                 M = face_warp
@@ -714,6 +714,10 @@ def main():
             else:
                 eprint('Error: No face detected yet!\a')
 
+        elif (c == 's'):        # Save a screenshot of the preview window
+            cv2.imwrite("screenshot.jpg", img)
+            print("Wrote screenshot to screenshot.jpg")
+
         elif (ord('0') <= ord(c) and ord(c) <= ord('9')  ): 
             # Try lower res for speed
             if   (c == '1'): downscale = 160
@@ -721,7 +725,7 @@ def main():
             elif (c == '3'): downscale = 640
             elif (c == '4'): downscale = 960
             elif (c == '5'): downscale = 1280
-            else:            downscale = 0
+            else:            downscale = 0 	# Native camera resolution
 
             recalculateFrameDownscale(downscale)
             cv2.resizeWindow( title, frame_downscale )
