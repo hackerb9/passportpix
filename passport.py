@@ -285,6 +285,10 @@ def findtheeyes(img, eye_pair):
     lefteyes = lefteye_cascade.detectMultiScale(roi_gray)
     left = None
     for (lx,ly,lw,lh) in lefteyes:
+        # Improve accuracy 
+        ly = ly + lh - eye_pair[3]
+        lh = eye_pair[3]        # single eye haar cascade is too high
+
         # Check each eye found and see if it is on the left side
         # of the eye pair rectangle. 
         left = (lx+lw/2, ly+lh/2) 	# Center of eye
@@ -300,18 +304,22 @@ def findtheeyes(img, eye_pair):
 
     righteyes = righteye_cascade.detectMultiScale(roi_gray)
     right = None
-    for (lx,ly,lw,lh) in righteyes:
+    for (rx,ry,rw,rh) in righteyes:
+        # Improve accuracy 
+        ry = ry + rh - eye_pair[3]
+        rh = eye_pair[3]        # single eye haar cascade is too high
+
         # Check each eye found and see if it is on the right side
         # of the eye pair rectangle. 
-        right = (lx+lw/2, ly+lh/2) 	# Center point of eye
+        right = (rx+rw/2, ry+rh/2) 	# Center point of eye
         if not isWithinRight( right, eye_pair ):
             # Reject
-            exOut(img, (lx,ly,lw,lh), yellow, 1)
+            exOut(img, (rx,ry,rw,rh), yellow, 1)
             right = None
             continue
         else:
             # Accept
-            cv2.rectangle(img,(lx,ly,lw,lh),yellow,2)
+            cv2.rectangle(img,(rx,ry,rw,rh),yellow,2)
             break
 
     if (left and right):
@@ -593,8 +601,9 @@ def printDebugInfo(face, eyes, left, right):
     print("\topengl: ",cv2.getWindowProperty(title, cv2.WND_PROP_OPENGL))
     print("\tvisible: ",cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE))
     print("\ttopmost: ",cv2.getWindowProperty(title, cv2.WND_PROP_TOPMOST))
-    print("Camera is capturing at %d x %d at %d FPS." %
-          (frame_width, frame_height, capture.get(cv2.CAP_PROP_FPS) ))
+    print("Camera is capturing at %d x %d at %d FPS" %
+          (frame_width, frame_height, capture.get(cv2.CAP_PROP_FPS)), end='')
+    print(" (actual %.2f FPS)." % fps.getFPS() if (fps.framecount > 2) else "" )
 
     print("Output image size will be %d x %d" %
           maxpect(photo_aspect, frame_width, frame_height))
