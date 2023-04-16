@@ -591,10 +591,19 @@ def set_fourcc(cap: cv2.VideoCapture, codec: str) -> bool:
 
 def printDebugInfo(face, eyes, left, right, original, img):
     print()
-    cv2.imwrite("original.jpg", original)
-    print("Wrote original camera capture to original.jpg")
-    cv2.imwrite("screenshot.jpg", img)
-    print("Wrote screenshot to screenshot.jpg")
+    cv2.imwrite("debug-original.jpg", original)
+    print("Wrote original camera capture to debug-original.jpg")
+    cv2.imwrite("debug-screenshot.jpg", img)
+    print("Wrote screenshot to debug-screenshot.jpg")
+    if (face_warp is not None):
+        scale = original.shape[0] / img.shape[0]
+        M = face_warp
+        M[0][2] *= scale 		# Scale the translation
+        M[1][2] *= scale		# part of the transform.
+        temp = cv2.warpAffine( original, M, original.shape[1::-1] )
+        temp = crop(temp)
+        cv2.imwrite("debug-passport.jpg", temp)
+        print("Wrote transformed face to to debug-passport.jpg")
     print()
     print(f"face is {face}\t left eye is {left}")
     print(f"eye pair is {eyes}\tright eye is {right}")
@@ -707,12 +716,12 @@ def main():
         elif (c == 'q' or c == '\x1b'): 	# q or ESC to quit
             break
 
-        elif (c == ' ' or c=='p'):	    	# Save the passport pix
+        elif (c == ' ' or c == 'p' ):	    	# Save the passport pix
             if (face_warp is not None):
                 scale = original.shape[0] / img.shape[0]
                 M = face_warp
-                M[0][2] *= scale # Scale up the translation part of the transform.
-                M[1][2] *= scale
+                M[0][2] *= scale 		# Scale the translation
+                M[1][2] *= scale		# part of the transform
                 img = cv2.warpAffine( original, M, original.shape[1::-1] )
                 img = crop(img)
                 cv2.imwrite("passport.jpg", img)
