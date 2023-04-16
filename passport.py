@@ -589,10 +589,16 @@ def set_fourcc(cap: cv2.VideoCapture, codec: str) -> bool:
             int.from_bytes(codec.encode(), byteorder=sys.byteorder))
     return codec == get_fourcc(cap)
 
-def printDebugInfo(face, eyes, left, right):
+def printDebugInfo(face, eyes, left, right, original, img):
+    print()
+    cv2.imwrite("original.jpg", original)
+    print("Wrote original camera capture to original.jpg")
+    cv2.imwrite("screenshot.jpg", img)
+    print("Wrote screenshot to screenshot.jpg")
     print()
     print(f"face is {face}\t left eye is {left}")
     print(f"eye pair is {eyes}\tright eye is {right}")
+    print(f"Transform Matrix is {face_warp}")
     print("GUI props")
     print("\trectangle", cv2.getWindowImageRect(title))
     print("\tfullscreen: ",cv2.getWindowProperty(title, cv2.WND_PROP_FULLSCREEN))
@@ -748,7 +754,7 @@ def main():
                    "scaling algorithm now in use." )
 
         elif (c == '\r' or c == '*'):        # debugging
-            printDebugInfo(face, eyes, left, right)
+            printDebugInfo(face, eyes, left, right, original, img)
 
         elif (c == '?' or c == 'h'):          		# show help
             printHelp()
