@@ -231,6 +231,7 @@ def findtheface(img):
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    eyes = None            # Array of rectangles for detected pair of eyes
 
     for (x,y,w,h) in faces:
         if (len(faces) != 1):	 	# Wrong number of faces
@@ -315,6 +316,7 @@ def findtheeyes(img, eye_pair):
 
     if (left and right):
         (oldleft, oldright) = (left, right)
+        #print ("Left", left, "\tRight", right, "\tEye pair", eye_pair)
 
     return (oldleft, oldright)
 
@@ -363,16 +365,8 @@ def centereyesscalechin(img, x_y_w_h, ex_ey_ew_eh):
     return M
 
 
-def iodtransform(img, l_r, r=None):
-    # Intraocular distance transform.
-    #
-    # Given an image and the center of left and right eyes,
-    # return the image warped such that eyes are:
-    # * horizontal,
-    # * at the correct eye_height, and
-    # * the proper distance apart (eye_distance).
-    #
-    # Note: eye_height/_distance are fractions of image height/width. 
+def buggyiodtransform(img, l_r, r=None):
+    # Intraocular distance transform, same as below, but buggy 
 
     if r is not None:
         l = l_r
@@ -393,8 +387,16 @@ def iodtransform(img, l_r, r=None):
     return M
 
 
-def buggyiodtransform(img, l_r, r=None):
-    # Intraocular distance transform, same as above, but buggy 
+def iodtransform(img, l_r, r=None):
+    # Intraocular distance transform.
+    #
+    # Given an image and the center of left and right eyes,
+    # return the image warped such that eyes are:
+    # * horizontal,
+    # * at the correct eye_height, and
+    # * the proper distance apart (eye_distance).
+    #
+    # Note: eye_height and _distance are fractions of image height/width. 
 
     if r is not None:
         l = l_r
@@ -408,47 +410,51 @@ def buggyiodtransform(img, l_r, r=None):
     Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 )
     IOD = eye_distance
 
-    print(f"Left: {Lu}, {Lv}\t\tRight: {Ru}, {Rv}")
-
     F = np.float32( [ [ 1, 0, -Lu ],
                       [ 0, 1, -Lv ],
                       [ 0, 0,  1  ] ] )
 
-    G = np.float32( [ [ (Ru-Lu)/Hyp, -(Rv-Lv)/Hyp, 0 ],
-                      [ (Rv-Lv)/Hyp,  (Ru-Lu)/Hyp, 0 ],
+    G = np.float32( [ [  (Ru-Lu)/Hyp,  (Rv-Lv)/Hyp, 0 ],
+                      [ -(Rv-Lv)/Hyp,  (Ru-Lu)/Hyp, 0 ],
                       [ 0,       0,      1 ] ] )
 
-    H = np.float32( [ [ w*IOD/(Ru-Lu), 0,        0 ],
-                      [ 0,        w*IOD/(Ru-Lu), 0 ],
+    scale=w*IOD/(Ru-Lu)
+    H = np.float32( [ [ scale, 0,        0 ],
+                      [ 0,        scale, 0 ],
                       [ 0,        0,        1 ] ] )
 
-    J = np.float32( [ [ 1, 0, w/2 - w*IOD/2 ],
-                      [ 0, 1, eye_height*h  ],
-                      [ 0, 0, 1             ] ] )
+    J = np.float32( [ [ 1, 	0, 	w/2 - w*IOD/2       ],
+                      [ 0, 	1, 	h - eye_height*h    ],
+                      [ 0, 	0, 	1                   ] ] )
 
     Fp = np.float32( [ [ 1, 0, Lu ],
                        [ 0, 1, Lv ],
                        [ 0, 0,  1 ] ] )
 
-    Gp = np.float32( [ [  (Ru-Lu)/Hyp, (Rv-Lv)/Hyp, 0 ],
-                       [ -(Rv-Lv)/Hyp, (Ru-Lu)/Hyp, 0 ],
+    Gp = np.float32( [ [  (Ru-Lu)/Hyp, -(Rv-Lv)/Hyp, 0 ],
+                       [  (Rv-Lv)/Hyp,  (Ru-Lu)/Hyp, 0 ],
                        [ 0,       0,      1 ] ] )
 
     Hp = np.float32( [ [ Hyp/(w*IOD),      0,          0 ],
                        [ 0,           Hyp/(w*IOD),     0 ],
                        [ 0,               0,           1 ] ] )
 
-    Jp = np.float32( [ [ 1, 0,  w*IOD/2 - w/2 ],
-                       [ 0, 1, -eye_height*h  ],
-                       [ 0, 0,  1             ] ] )
+    Jp = np.float32( [ [ 1, 	0,  	w*IOD/2 - w/2   ],
+                       [ 0, 	1, 	eye_height*h    ],
+                       [ 0, 	0,  	1               ] ] )
 
-    print( "F\n", F )
-    print( "G\n", G )
-    print( "H\n", H )
-    print( "J\n", J )
+    # print( "F\n", F )
+    # print( "G\n", G )
+    # print( "H\n", H )
+    # print( "J\n", J )
               
-    N=J*H*G*F
-    return N[:][0:2]
+    # img = cv2.warpAffine( img, F[:][0:2], img.shape[1::-1] )
+    # img = cv2.warpAffine( img, G[:][0:2], img.shape[1::-1] )
+    # img = cv2.warpAffine( img, H[:][0:2], img.shape[1::-1] )
+    # img = cv2.warpAffine( img, J[:][0:2], img.shape[1::-1] )
+
+    # Apply all the transformations together as a single transform using matrix multiply
+    return (J @ H @ G @ F)[:][0:2]
 
 def crop(img):
     # Given an image, and the global variable photo_aspect,
@@ -654,7 +660,7 @@ def main():
                         # Fallback to using the chin distance for scaling.
                         face_warp = centereyesscalechin(img, face, eyes)
 
-                    img = cv2.warpAffine( img, face_warp, img.shape[1::-1] ) 
+                    img = cv2.warpAffine( img, face_warp, img.shape[1::-1] )
 
                     # Crop to the proper aspect ratio
                     img=crop(img)
