@@ -204,7 +204,7 @@ def init():
     # frame_downscale is the (width, height) for Haar processing and display.
     # (Same aspect ratio as the frame_width/frame_height, but fits in
     # a square of length downscale).
-    recalculate_frame_downscale(downscale)
+    recalculateFrameDownscale(downscale)
 
     # Read at least one image before starting the FPS counter 
     capture.read()
@@ -470,7 +470,7 @@ def crop(img):
     img = cv2.warpAffine(img,M,(final_width,final_height))
     return img
 
-def recalculate_frame_downscale(downscale):
+def recalculateFrameDownscale(downscale):
     # Sets frame_downscale based on frame_width, frame_height, and downscale.
 
     # FRAME_WIDTH, FRAME_HEIGHT is the size of the video capture frame.
@@ -581,7 +581,7 @@ def set_fourcc(cap: cv2.VideoCapture, codec: str) -> bool:
             int.from_bytes(codec.encode(), byteorder=sys.byteorder))
     return codec == get_fourcc(cap)
 
-def print_debug_info(face, eyes, left, right):
+def printDebugInfo(face, eyes, left, right):
     print()
     print(f"face is {face}\t left eye is {left}")
     print(f"eye pair is {eyes}\tright eye is {right}")
@@ -600,7 +600,7 @@ def print_debug_info(face, eyes, left, right):
           maxpect(photo_aspect, frame_width, frame_height))
 
 
-def print_help():
+def printHelp():
     print("""
 Keys available:
     q  (or Esc)		Quit
@@ -714,7 +714,7 @@ def main():
             elif (c == '5'): downscale = 1280
             else:            downscale = 0
 
-            recalculate_frame_downscale(downscale)
+            recalculateFrameDownscale(downscale)
             cv2.resizeWindow( title, frame_downscale )
 
         elif (c == 'f'):          		# Toggle full screen
@@ -724,7 +724,7 @@ def main():
         elif (c == 'r'):          		# Rotate camera
             camera_rotation = (camera_rotation + 1) % 4
             frame_width, frame_height = frame_height, frame_width
-            recalculate_frame_downscale(downscale)
+            recalculateFrameDownscale(downscale)
 
         elif (c == 'm'):          		# Toggle mirroring
             camera_mirrored = 1 - camera_mirrored
@@ -735,10 +735,10 @@ def main():
                    "scaling algorithm now in use." )
 
         elif (c == '\r' or c == '*'):        # debugging
-            print_debug_info(face, eyes, left, right)
+            printDebugInfo(face, eyes, left, right)
 
         elif (c == '?' or c == 'h'):          		# show help
-            print_help()
+            printHelp()
         else:
             eprint('Unknown key %c (%x)' % (c, k))
 
