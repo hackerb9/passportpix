@@ -4,6 +4,7 @@ global photo_width, photo_height, photo_aspect
 global eye_distance, eye_height
 global chin_height, use_chin_scaling
 global camera_device, camera_rotation, camera_codec, camera_fps
+global display_rotation
 global downscale
 
 # Photo metadata (Note: not saved in .jpg file, yet)
@@ -33,6 +34,9 @@ camera_device=0
 
 # Is camera on its side? 0 == nope, 1 == 90, 2 == 180, 3 == 270.
 camera_rotation=0
+
+# Is display screen on its side? 0 == nope, 1 == 90, 2 == 180, 3 == 270.
+display_rotation=0
 
 # Show the image like in a mirror (flipped horizontal)
 camera_mirrored=1
@@ -187,6 +191,7 @@ def init():
         # Gstreamer gets so confused the camera has to be reopened.
         capture = cv2.VideoCapture(camera_device, backend)
 
+    # Size of the frame captured from the camera
     frame_width=float(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height=float(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
@@ -652,6 +657,7 @@ Keys available:
     Spacebar		Save image to passport.jpg
     f			Toggle fullscreen
     r			Change camera rotation by 90 degrees
+    d			Change display rotation by 90 degrees
     m			Toggle mirroring of image
     1-5			Change internal downscaling (for slow computers)
     0			Disable downscaling completely
@@ -662,7 +668,7 @@ Keys available:
 
 def main():    
     global downscale, frame_downscale, frame_height, frame_width
-    global camera_mirrored, camera_rotation
+    global camera_mirrored, camera_rotation, display_rotation
     global face_warp, use_chin_scaling 
 
     # OpenCV coordinates of detected features 
@@ -679,7 +685,7 @@ def main():
 
         fps.incrementFrames()
 
-        # Rotate the image, if the camera is on its side
+        # Rotate the captured frame, if the camera is on its side
         if (camera_rotation):
             original=np.rot90(original, camera_rotation)
 
@@ -723,6 +729,9 @@ def main():
                     # OpenCV's resizeWindow is buggy, especially with fullscreen
                     #cv2.resizeWindow(title, img.shape[0:2])
 
+        # If the display is on its side, rotate the image to match.
+        if display_rotation:
+            img = np.rot90(img, 4-display_rotation)
 
         # Show the image (and frames per second)
         cv2.imshow(title, cv2.flip(img,1) if camera_mirrored else img)
@@ -731,8 +740,8 @@ def main():
             eprint('%.2f fps' % fps.getFPS(), end='\r')
             fps.reset()
 
-        # Show image and wait for a key
-        k = cv2.waitKey(1)
+        # Check for a keystroke
+        k = cv2.pollKey()
         c = chr(k & 0xFF)
 
         if (k == -1):           # No key hit, wait timed out.
@@ -778,6 +787,9 @@ def main():
             camera_rotation = (camera_rotation + 1) % 4
             frame_width, frame_height = frame_height, frame_width
             recalculateFrameDownscale(downscale)
+
+        elif (c == 'd'):          		# Rotate display screen
+            display_rotation = (display_rotation + 1) % 4
 
         elif (c == 'm'):          		# Toggle mirroring
             camera_mirrored = 1 - camera_mirrored
