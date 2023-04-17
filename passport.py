@@ -419,13 +419,12 @@ def iodtransform(img, l_r, r=None):
     
     (Lu, Lv) = l
     (Ru, Rv) = r
-    (h, w, channels) = img.shape
+    (w, h) = (img.shape[1], img.shape[0])
 
     # Pixel locations
     IOD = eye_distance * w                  # Desired intraocular distance.
     Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 ) # Actual distance between eyes.
-    scale=IOD/Hyp                           # How much to scale the image.
-
+    Scale = IOD / Hyp                       # How much to scale the image.
     Yey = h - eye_height * h                # Desired y-coordinate of eyes.
 
     # Move Left eye to origin
@@ -433,17 +432,19 @@ def iodtransform(img, l_r, r=None):
                       [ 0, 1, -Lv ],
                       [ 0, 0,  1  ] ] )
 
-    # Rotate so right eye is on X-axis
+    # Rotate around origin so right eye is on X-axis
     G = np.float32( [ [  (Ru-Lu)/Hyp,  (Rv-Lv)/Hyp, 0 ],
                       [ -(Rv-Lv)/Hyp,  (Ru-Lu)/Hyp, 0 ],
                       [ 0,       0,      1 ] ] )
 
     # Scale so that intraocular distance is correct proportion of width.
-    H = np.float32( [ [ scale, 0,        0 ],
-                      [ 0,        scale, 0 ],
-                      [ 0,        0,        1 ] ] )
+    # (Scale is IOD/Hyp)
+    H = np.float32( [ [ Scale, 0,     0 ],
+                      [ 0,     Scale, 0 ],
+                      [ 0,     0,     1 ] ] )
 
     # Translate so left eye is at eye_height and half the IOD to the middle.
+    # (Yey is h - eye_height * h)
     J = np.float32( [ [ 1, 	0, 	w/2 - IOD/2 ],
                       [ 0, 	1, 	Yey         ],
                       [ 0, 	0, 	1           ] ] )
@@ -714,13 +715,13 @@ def main():
                     # Crop to the proper aspect ratio
                     img=crop(img)
 
+                    # If grid is turned on, draw directly on image.
+                    if (show_grid):
+                        drawGrid(img)
+
                     # OpenCV's resizeWindow is buggy, especially with fullscreen
                     #cv2.resizeWindow(title, img.shape[0:2])
 
-
-        # If grid is turned on, draw directly on image.
-        if (show_grid):
-            drawGrid(img)
 
         # Show the image (and frames per second)
         cv2.imshow(title, cv2.flip(img,1) if camera_mirrored else img)
