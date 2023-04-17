@@ -420,12 +420,13 @@ def iodtransform(img, l_r, r=None):
     (Lu, Lv) = l
     (Ru, Rv) = r
     (w, h) = (img.shape[1], img.shape[0])
+    (finalw, finalh) = maxpect(photo_aspect, w, h)
 
     # Pixel locations
-    IOD = eye_distance * w                  # Desired intraocular distance.
+    IOD = eye_distance * finalw             # Desired intraocular distance.
     Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 ) # Actual distance between eyes.
     Scale = IOD / Hyp                       # How much to scale the image.
-    Yey = h - eye_height * h                # Desired y-coordinate of eyes.
+    Yey = finalh - eye_height * finalh      # Desired y-coordinate of eyes.
 
     # Move Left eye to origin
     F = np.float32( [ [ 1, 0, -Lu ],
