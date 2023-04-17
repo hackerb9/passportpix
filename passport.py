@@ -54,6 +54,9 @@ camera_fps=None
 # but the poor quality from compression makes it a questionable tradeoff.
 camera_codec=None
 
+# For debugging, draw a grid on the face.
+show_grid=True
+
 ######################################################################
 
 import cv2 as cv2
@@ -418,26 +421,35 @@ def iodtransform(img, l_r, r=None):
     (Ru, Rv) = r
     (h, w, channels) = img.shape
 
-    Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 )
-    IOD = eye_distance
+    # Pixel locations
+    IOD = eye_distance * w                  # Desired intraocular distance.
+    Hyp = sqrt( (Ru-Lu)**2  +  (Rv-Lv)**2 ) # Actual distance between eyes.
+    scale=IOD/Hyp                           # How much to scale the image.
 
+    Yey = h - eye_height * h                # Desired y-coordinate of eyes.
+
+    # Move Left eye to origin
     F = np.float32( [ [ 1, 0, -Lu ],
                       [ 0, 1, -Lv ],
                       [ 0, 0,  1  ] ] )
 
+    # Rotate so right eye is on X-axis
     G = np.float32( [ [  (Ru-Lu)/Hyp,  (Rv-Lv)/Hyp, 0 ],
                       [ -(Rv-Lv)/Hyp,  (Ru-Lu)/Hyp, 0 ],
                       [ 0,       0,      1 ] ] )
 
-    scale=w*IOD/(Ru-Lu)
+    # Scale so that intraocular distance is correct proportion of width.
     H = np.float32( [ [ scale, 0,        0 ],
                       [ 0,        scale, 0 ],
                       [ 0,        0,        1 ] ] )
 
-    J = np.float32( [ [ 1, 	0, 	w/2 - w*IOD/2       ],
-                      [ 0, 	1, 	h - eye_height*h    ],
-                      [ 0, 	0, 	1                   ] ] )
+    # Translate so left eye is at eye_height and half the IOD to the middle.
+    J = np.float32( [ [ 1, 	0, 	w/2 - IOD/2 ],
+                      [ 0, 	1, 	Yey         ],
+                      [ 0, 	0, 	1           ] ] )
 
+
+    ## In case we need to invert the matrices, these might work.
     Fp = np.float32( [ [ 1, 0, Lu ],
                        [ 0, 1, Lv ],
                        [ 0, 0,  1 ] ] )
@@ -446,13 +458,13 @@ def iodtransform(img, l_r, r=None):
                        [  (Rv-Lv)/Hyp,  (Ru-Lu)/Hyp, 0 ],
                        [ 0,       0,      1 ] ] )
 
-    Hp = np.float32( [ [ Hyp/(w*IOD),      0,          0 ],
-                       [ 0,           Hyp/(w*IOD),     0 ],
+    Hp = np.float32( [ [ Hyp/IOD,      0,          0 ],
+                       [ 0,           Hyp/IOD,     0 ],
                        [ 0,               0,           1 ] ] )
 
-    Jp = np.float32( [ [ 1, 	0,  	w*IOD/2 - w/2   ],
-                       [ 0, 	1, 	eye_height*h    ],
-                       [ 0, 	0,  	1               ] ] )
+    Jp = np.float32( [ [ 1, 	0,  	IOD/2 - w/2  ],
+                       [ 0, 	1, 	-Yey         ],
+                       [ 0, 	0,  	1            ] ] )
 
     # print( "F\n", F )
     # print( "G\n", G )
@@ -556,6 +568,13 @@ def exOut(img, rect_x_y_w_h, color_y, thickness_w, h=None, color=None, thickness
     cv2.line(img,(x+w,y),(x,y+h),color,thickness)
 
     
+def drawGrid(img):
+    """Given an image, draw a 12x12 grid on it"""
+    height, width, channels = img.shape
+    for h in range(int(height/12), height, int(height/12)):
+        for w in range(int(width/12), width, int(width/12)):
+            img[h][w] = (255, 255, 255)
+
 def get_fourcc(cap: cv2.VideoCapture) -> str:
     """Return the 4-letter string of the codec the camera is using.
 
@@ -696,8 +715,12 @@ def main():
                     img=crop(img)
 
                     # OpenCV's resizeWindow is buggy, especially with fullscreen
-#                    cv2.resizeWindow(title, img.shape[0:2])
+                    #cv2.resizeWindow(title, img.shape[0:2])
 
+
+        # If grid is turned on, draw directly on image.
+        if (show_grid):
+            drawGrid(img)
 
         # Show the image (and frames per second)
         cv2.imshow(title, cv2.flip(img,1) if camera_mirrored else img)
