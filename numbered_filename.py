@@ -9,7 +9,7 @@ import glob
 if __debug__:
     import os
 
-def numbered_filename(template :str, width :int =3) -> str:
+def numbered_filename(template :str ='', width :int =3) -> str:
     """Return the next filename in an incrementing sequence by adding
     one to the current largest number in existing filenames.
 
@@ -33,10 +33,10 @@ def numbered_filename(template :str, width :int =3) -> str:
 
     The number will be left-padded with zeroes to contain at least
     three digits, unless the optional 'width' argument is given.
-    Zero-padding can be disabled with 'width=0'. For example,
-    'numbered_filename("hackerb*", width=0)' might return 'hackerb9'.
+    Zero-padding can be disabled with 'width=1'. For example,
+    'numbered_filename("hackerb*", width=1)' might return 'hackerb9'.
     Note that 'width' is a minimum and more digits will be used if
-    necessary. (E.g., 'foo-1000.txt').
+    necessary (e.g., 'foo-1000.txt').
 
     Regardless of the 'width' setting, existing filenames need not be
     zero-padded to be recognized. For example, if a directory has the
@@ -45,19 +45,23 @@ def numbered_filename(template :str, width :int =3) -> str:
     This routine always return the next higher number after any
     existing file, even if a lower number is available. For example,
     in a directory containing only 'foo-099.txt', the next file would
-    be 'foo-100.txt', despite 'foo-000' through '-098.txt' being possible.
+    be 'foo-100.txt', despite 'foo-000' through '-098.txt' being free.
 
-    Peculiar Circumstances: If the template is the empty string (''),
-    then the output will simply be a sequence number ('007'). If the
-    template contains no asterisks ('foo'), then the number is
-    appended to the end of the filename ('foo007'). If more than one
-    asterisk is used ('*NSYNC*.txt'), then only the rightmost asterisk
-    is replaced with a number ('*NSYNC007.txt'). All others asterisks
-    are kept as literal '*' in the filename.
+    Peculiar Circumstances:
+
+    * If the template is the empty string (''), then the output will
+      simply be a sequence number ('007').
+
+    * If the template contains no asterisks ('foo'), then the number
+      is appended to the end of the filename ('foo007').
+
+    * If more than one asterisk is used ('*NSYNC*.txt'), then only the
+      rightmost asterisk is replaced with a number ('*NSYNC007.txt').
+      All others asterisks are kept as literal '*' in the filename.
 
     CAVEAT: While the code attempts to return an unused filename, it
-    is not guaranteed as there is a fairly obvious race condition. To
-    avoid it, processes writing to the same directory concurrently
+    is not guaranteed as there is a fairly obvious race condition. 
+    To avoid it, processes writing to the same directory concurrently
     must not use the same template. Do not use this to create temp
     files in a directory where an adversary may have write access,
     such as /tmp -- instead use 'mkstemp'.
@@ -66,16 +70,20 @@ def numbered_filename(template :str, width :int =3) -> str:
     if not isinstance(template, str):
         raise TypeError("numbered_filename() requires a string as a template, such as foo-*.txt")
 
+    if not isinstance(width, int):
+        raise TypeError("numbered_filename() requires 'width' to be an int or omitted")
+
     (filename, asterisk, extension) =  template.rpartition('*')
     if not asterisk:
         (filename, extension) = (extension, filename)
         template=f'{filename}*'
 
     try:
-        files = [int(f.lstrip(filename).rstrip(extension))
-                 for f in glob.glob(template)
-                 if f.lstrip(filename).rstrip(extension).isdigit()]
-        num = sorted(files)[-1]
+        existing = [ int(f)
+                     for f in [g.lstrip(filename).rstrip(extension)
+                               for g in glob.glob(template)]
+                     if f.isdigit()]
+        num = max(existing)
     except (IndexError, ValueError):
         num = -1
 
@@ -83,9 +91,9 @@ def numbered_filename(template :str, width :int =3) -> str:
     spec = f'0>{width}'
     numstr = format(num, spec)
 
-    if __debug__:
-        result = filename + numstr + extension
-        if os.path.exists(result):
-            raise AssertionError(f'Error: "{result}" already exists. Race condition or bug?')
+    result = filename + numstr + extension
 
-    return filename + numstr + extension
+    if __debug__ and os.path.exists(result):
+        raise AssertionError(f'Error: "{result}" already exists. Race condition or bug?')
+
+    return result
